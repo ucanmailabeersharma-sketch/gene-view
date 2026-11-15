@@ -1,0 +1,1313 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gene View</title>
+<meta name="description" content="A holographic, scroll-driven journey through DNA, from the double helix down to the inside of a real human gene.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#01070d; --ink:#dcfff7; --mut:rgba(190,240,232,.66); --dim:rgba(160,220,210,.4);
+  --teal:#19e6c1; --cyan:#2ee6ff; --blue:#2a8cff; --line:rgba(46,230,200,.22);
+  --A:#29f5a6; --T:#22b8ff; --G:#c6ff4d; --C:#8a7dff; --warn:#ff5f7e; --fe:#ffd27a;
+  --mono:"JetBrains Mono",ui-monospace,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{background:var(--bg)}
+body{background:var(--bg);color:var(--ink);font-family:"Space Grotesk",system-ui,sans-serif;overflow-x:hidden;-webkit-font-smoothing:antialiased}
+::selection{background:rgba(25,230,193,.35)}
+#gl{position:fixed;inset:0;width:100vw;height:100vh;display:block;z-index:0}
+.fx{position:fixed;inset:0;pointer-events:none;z-index:2}
+.scan{background:repeating-linear-gradient(0deg,rgba(120,255,230,.03) 0 1px,transparent 1px 3px)}
+.vig{background:radial-gradient(ellipse at center,transparent 55%,rgba(0,3,6,.7))}
+#flash{background:radial-gradient(circle at 50% 50%,rgba(200,255,245,.95),rgba(40,200,255,.35) 35%,transparent 70%);opacity:0;z-index:4}
+
+/* loader */
+#loader{position:fixed;inset:0;z-index:50;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;transition:opacity .8s ease,visibility .8s}
+#loader.done{opacity:0;visibility:hidden}
+.ld-bars{display:flex;gap:5px;height:46px;align-items:center}
+.ld-bars i{width:4px;border-radius:2px;background:var(--teal);animation:ld 1.1s ease-in-out infinite;box-shadow:0 0 10px var(--teal)}
+@keyframes ld{0%,100%{height:8px;opacity:.4}50%{height:44px;opacity:1}}
+.ld-text{font-family:var(--mono);font-size:12px;letter-spacing:.3em;color:var(--mut)}
+
+/* HUD */
+.hud{position:fixed;top:0;left:0;right:0;z-index:10;display:flex;justify-content:space-between;align-items:center;padding:18px 26px;pointer-events:none}
+.logo{pointer-events:auto;display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:.18em;font-size:14px;color:var(--ink);text-decoration:none}
+.logo b{color:var(--teal);font-weight:700}
+.logo-mark{width:22px;height:22px;border-radius:50%;border:1.5px solid var(--teal);position:relative;box-shadow:0 0 12px rgba(25,230,193,.6),inset 0 0 8px rgba(25,230,193,.5)}
+.logo-mark::before,.logo-mark::after{content:"";position:absolute;left:50%;top:3px;bottom:3px;width:8px;margin-left:-4px;border-left:1.5px solid var(--cyan);border-right:1.5px solid var(--teal);border-radius:50%;animation:spin 3s linear infinite}
+.logo-mark::after{animation-delay:-1.5s;opacity:.6}
+@keyframes spin{to{transform:rotateY(360deg)}}
+.readout{font-family:var(--mono);font-size:11px;color:var(--mut);display:flex;gap:18px;letter-spacing:.12em;text-transform:uppercase}
+.readout span:first-child{color:var(--teal)}
+.progress{position:fixed;top:0;left:0;height:2px;background:linear-gradient(90deg,var(--teal),var(--cyan));z-index:11;box-shadow:0 0 10px var(--teal);width:0}
+.ticker{position:fixed;left:26px;bottom:20px;z-index:10;font-family:var(--mono);font-size:12px;letter-spacing:.28em;pointer-events:none;opacity:.85;white-space:nowrap}
+.ticker small{display:block;font-size:9px;letter-spacing:.3em;color:var(--dim);margin-bottom:5px}
+.ticker .r{display:block;line-height:1.5}
+
+/* rail */
+.rail{position:fixed;right:22px;top:50%;transform:translateY(-50%);z-index:10;display:flex;flex-direction:column;gap:12px}
+.rail button{all:unset;cursor:pointer;display:flex;align-items:center;justify-content:flex-end;gap:10px;height:12px}
+.rail button i{width:7px;height:7px;border-radius:50%;border:1px solid rgba(46,230,200,.5);transition:all .3s}
+.rail button span{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--mut);opacity:0;transform:translateX(6px);transition:all .25s;white-space:nowrap}
+.rail button:hover span,.rail button:focus-visible span{opacity:1;transform:none}
+.rail button.on i{background:var(--teal);box-shadow:0 0 10px var(--teal);transform:scale(1.35)}
+.rail button.on span{opacity:1;transform:none;color:var(--teal)}
+
+/* tooltip */
+.tip{position:fixed;z-index:12;pointer-events:none;font-family:var(--mono);font-size:11px;line-height:1.55;background:rgba(2,18,24,.86);border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-width:190px;opacity:0;transform:translate(14px,14px);transition:opacity .15s;backdrop-filter:blur(8px)}
+.tip.on{opacity:1}
+.tip b{font-size:14px;letter-spacing:.06em}
+.tip .k{color:var(--dim)}
+
+/* chapters */
+main{position:relative;z-index:3;pointer-events:none}
+.chap{height:280vh;position:relative}
+.chap.hero{height:200vh}
+.chap.dive{height:320vh}
+.card > *,.dive-card > *{will-change:opacity,transform}
+.pin{position:sticky;top:0;height:100vh;display:flex;align-items:center;padding:0 7vw}
+.card{pointer-events:auto;max-width:450px;background:linear-gradient(160deg,rgba(6,36,44,.82),rgba(2,12,20,.86));border:1px solid var(--line);border-radius:18px;padding:26px 26px 22px;backdrop-filter:blur(12px) saturate(130%);-webkit-backdrop-filter:blur(12px) saturate(130%);box-shadow:0 20px 60px rgba(0,0,0,.45),0 0 50px rgba(25,230,193,.05);position:relative;will-change:opacity,transform;opacity:0}
+.card.right{margin-left:auto}
+.card::before,.card::after{content:"";position:absolute;width:16px;height:16px;border-color:var(--teal);border-style:solid;opacity:.8}
+.card::before{top:-1px;left:-1px;border-width:2px 0 0 2px;border-radius:18px 0 0 0}
+.card::after{bottom:-1px;right:-1px;border-width:0 2px 2px 0;border-radius:0 0 18px 0}
+.ch-num{font-family:var(--mono);font-size:11px;letter-spacing:.25em;color:var(--teal);margin-bottom:12px;display:flex;align-items:center;gap:10px}
+.ch-num::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,var(--line),transparent)}
+.ch-num span{color:var(--dim)}
+.card h2{font-size:clamp(26px,3vw,36px);line-height:1.05;letter-spacing:-.02em;margin-bottom:12px;font-weight:600}
+.card h2 em{font-style:normal;color:var(--teal)}
+.card p{color:var(--mut);font-size:15.5px;line-height:1.6}
+.card p b{color:var(--ink);font-weight:600}
+.facts{list-style:none;display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:18px}
+.facts li{border-top:1px solid var(--line);padding-top:9px}
+.facts b{display:block;font-family:var(--mono);font-size:19px;color:var(--ink);font-weight:600}
+.facts span{font-size:11.5px;color:var(--dim);line-height:1.35;display:block;margin-top:2px}
+.chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:16px}
+.chip{all:unset;cursor:pointer;font-family:var(--mono);font-size:11.5px;padding:7px 11px;border-radius:999px;border:1px solid var(--line);color:var(--mut);transition:all .2s;display:flex;align-items:center;gap:7px}
+.chip i{width:8px;height:8px;border-radius:50%;background:var(--c,var(--teal));box-shadow:0 0 8px var(--c,var(--teal))}
+.chip:hover{border-color:var(--c,var(--teal));color:var(--ink)}
+.chip.on{background:color-mix(in srgb,var(--c,var(--teal)) 18%,transparent);border-color:var(--c,var(--teal));color:var(--ink)}
+.chip:focus-visible,.hs:focus-visible,.navb:focus-visible,.seg:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+.hint{font-family:var(--mono);font-size:11px!important;color:var(--dim)!important;margin-top:12px;letter-spacing:.04em}
+.legend{display:flex;gap:14px;margin-top:14px;font-family:var(--mono);font-size:11px;color:var(--mut);flex-wrap:wrap}
+.legend span{display:flex;align-items:center;gap:6px}
+.legend i{width:10px;height:3px;border-radius:2px;background:var(--c)}
+
+/* hero */
+.hero .pin{justify-content:flex-start;text-align:left}
+.hero .lede{margin-left:0;text-shadow:0 2px 18px #01070d}
+@media (max-width:820px){.hero .pin{justify-content:center;text-align:center}.hero .lede{margin:24px auto 0}}
+.hero-card{pointer-events:auto;max-width:820px;opacity:1}
+.eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.3em;color:var(--teal);margin-bottom:18px}
+.title{font-size:clamp(64px,12.5vw,176px);font-weight:700;letter-spacing:-.05em;line-height:.86;background:linear-gradient(100deg,#eafffb 0%,#62f7d8 30%,#2ea8ff 55%,#62f7d8 75%,#eafffb 100%);background-size:220% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 0 32px rgba(40,230,200,.35));animation:sheen 7s linear infinite}
+@keyframes sheen{to{background-position:-220% 0}}
+.lede{color:var(--mut);font-size:clamp(16px,1.6vw,19px);line-height:1.6;max-width:560px;margin:24px auto 0}
+.cue{margin-top:44px;display:inline-flex;flex-direction:column;align-items:center;gap:12px;font-family:var(--mono);font-size:10.5px;letter-spacing:.32em;color:var(--dim)}
+.cue i{width:22px;height:36px;border:1.5px solid var(--line);border-radius:12px;position:relative}
+.cue i::after{content:"";position:absolute;left:50%;top:7px;width:3px;height:7px;margin-left:-1.5px;border-radius:2px;background:var(--teal);animation:cue 1.8s ease-in-out infinite}
+@keyframes cue{0%{opacity:0;transform:translateY(0)}40%{opacity:1}100%{opacity:0;transform:translateY(12px)}}
+
+/* dive */
+.dive .pin{justify-content:center;text-align:center}
+.dive-card{opacity:0;pointer-events:none}
+.dive-h{font-size:clamp(48px,9vw,128px);font-weight:700;letter-spacing:-.04em;line-height:.9;color:#eafffb;text-shadow:0 0 40px rgba(25,230,193,.7)}
+.dive-card p{color:var(--mut);margin-top:20px;font-size:17px}
+.dive-card p b{color:var(--teal)}
+
+/* explorer */
+#explorer{position:relative;z-index:3;min-height:100vh;padding:84px 0 40px;background:linear-gradient(180deg,rgba(1,7,13,0) 0,rgba(1,7,13,.78) 10vh,rgba(1,7,13,.88) 40vh);pointer-events:auto}
+body.in-ex .ticker,body.in-ex .rail{opacity:0;pointer-events:none}
+.ticker,.rail{transition:opacity .4s}
+.ex-head{max-width:1100px;margin:0 auto;padding:0 24px;display:flex;justify-content:space-between;align-items:flex-end;gap:30px;flex-wrap:wrap}
+.ex-head h2{font-size:clamp(30px,4vw,50px);letter-spacing:-.03em;line-height:1;font-weight:600}
+.ex-head h2 em{font-style:normal;color:var(--teal)}
+.ex-head p{color:var(--mut);max-width:470px;font-size:15px;line-height:1.55}
+.genemap{max-width:1100px;margin:26px auto 18px;padding:0 24px;display:flex;align-items:center;position:relative}
+.genemap::before{content:"";position:absolute;left:24px;right:24px;top:22px;height:1px;background:var(--line)}
+.seg{all:unset;cursor:pointer;position:relative;flex:var(--f) 1 0;min-width:0;display:flex;flex-direction:column;align-items:stretch;gap:8px}
+.seg .bar{height:44px;display:flex;align-items:center;position:relative}
+.seg .bar i{display:block;width:100%;border-radius:4px;transition:all .3s;background:color-mix(in srgb,var(--k) 30%,transparent);border:1px solid color-mix(in srgb,var(--k) 70%,transparent)}
+.seg.exon .bar i{height:30px}
+.seg.utr .bar i{height:18px}
+.seg.reg .bar i{height:14px;border-style:dashed}
+.seg.intron .bar i{height:2px;border:none;background:repeating-linear-gradient(90deg,var(--k) 0 6px,transparent 6px 10px)}
+.seg.prot .bar i{height:22px;border-radius:11px}
+.seg span{font-family:var(--mono);font-size:10px;letter-spacing:.08em;color:var(--dim);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:color .3s}
+.seg:hover span{color:var(--ink)}
+.seg.on .bar i{background:color-mix(in srgb,var(--k) 60%,transparent);box-shadow:0 0 18px var(--k)}
+.seg.intron.on .bar i{height:3px;box-shadow:0 0 12px var(--k)}
+.seg.on span{color:var(--k)}
+.seg + .seg{margin-left:4px}
+.track{display:flex;gap:22px;overflow-x:auto;scroll-snap-type:x mandatory;padding:6px calc(50vw - var(--cw)/2) 18px;--cw:min(1100px,92vw);scrollbar-width:none;cursor:grab;overscroll-behavior-x:contain}
+.track::-webkit-scrollbar{display:none}
+.track.drag{scroll-snap-type:none;cursor:grabbing;user-select:none}
+.gcard{flex:0 0 var(--cw);scroll-snap-align:center;display:grid;grid-template-columns:1.45fr 1fr;gap:24px;background:linear-gradient(160deg,rgba(6,38,46,.55),rgba(3,14,24,.7));border:1px solid var(--line);border-radius:20px;padding:22px;transition:opacity .4s,transform .4s;opacity:.35;transform:scale(.95);position:relative}
+.gcard.on{opacity:1;transform:none;border-color:color-mix(in srgb,var(--k) 45%,transparent);box-shadow:0 0 60px color-mix(in srgb,var(--k) 10%,transparent)}
+.gc-stage{position:relative;border-radius:14px;overflow:hidden;background:radial-gradient(ellipse at 50% 60%,rgba(25,230,193,.06),transparent 70%),linear-gradient(rgba(46,230,200,.05) 1px,transparent 1px) 0 0/100% 24px,linear-gradient(90deg,rgba(46,230,200,.05) 1px,transparent 1px) 0 0/24px 100%;border:1px solid rgba(46,230,200,.12);min-height:340px}
+.gc-stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.gc-num{position:absolute;top:10px;left:12px;font-family:var(--mono);font-size:10px;letter-spacing:.2em;color:var(--dim)}
+.gc-body{display:flex;flex-direction:column;min-width:0}
+.gc-head{display:flex;justify-content:space-between;gap:10px;font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;margin-bottom:10px}
+.gc-tag{color:var(--k)}
+.gc-co{color:var(--dim)}
+.gcard h3{font-size:clamp(22px,2.2vw,28px);line-height:1.1;letter-spacing:-.02em;font-weight:600;margin-bottom:10px}
+.gc-desc{color:var(--mut);font-size:14.5px;line-height:1.58}
+.gc-hs{display:flex;flex-wrap:wrap;gap:7px;margin:16px 0 12px}
+.hs{all:unset;cursor:pointer;font-family:var(--mono);font-size:11px;padding:7px 11px;border-radius:999px;border:1px solid color-mix(in srgb,var(--k) 45%,transparent);color:var(--ink);display:flex;align-items:center;gap:7px;transition:all .2s}
+.hs i{width:7px;height:7px;border-radius:50%;background:var(--k);box-shadow:0 0 8px var(--k);animation:pulse 1.8s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.35}}
+.hs:hover{background:color-mix(in srgb,var(--k) 14%,transparent)}
+.hs.on{background:color-mix(in srgb,var(--k) 26%,transparent);border-color:var(--k)}
+.hs.tg{border-color:rgba(255,95,126,.6)}
+.hs.tg i{background:var(--warn);box-shadow:0 0 8px var(--warn)}
+.hs.tg.on{background:rgba(255,95,126,.2)}
+.gc-info{margin-top:auto;font-size:13.5px;line-height:1.55;color:var(--mut);border-left:2px solid var(--k);padding:10px 12px;background:rgba(0,0,0,.18);border-radius:0 10px 10px 0;min-height:86px}
+.gc-info b{color:var(--ink);display:block;margin-bottom:3px;font-size:14px}
+.gc-note{font-family:var(--mono);font-size:10px;color:var(--dim);margin-top:8px;letter-spacing:.04em}
+.ex-nav{display:flex;justify-content:center;align-items:center;gap:18px;margin-top:6px;font-family:var(--mono);font-size:12px;color:var(--mut);letter-spacing:.14em}
+.navb{all:unset;cursor:pointer;width:42px;height:42px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;color:var(--teal);font-size:18px;transition:all .2s}
+.navb:hover{background:rgba(25,230,193,.12);border-color:var(--teal)}
+.swipe-hint{font-family:var(--mono);font-size:10.5px;color:var(--dim);text-align:center;margin-top:12px;letter-spacing:.2em}
+footer{text-align:center;font-family:var(--mono);font-size:11px;color:var(--dim);letter-spacing:.14em;padding:40px 20px 10px}
+footer a{color:var(--teal)}
+
+@media (max-width:820px){
+  .hud{padding:14px 16px}
+  .readout span:last-child{display:none}
+  .rail{display:none}
+  .ticker{display:none}
+  .pin{align-items:flex-end;padding:0 16px 22px}
+  .card{max-width:none;padding:20px 18px 18px}
+  .card p{font-size:14.5px}
+  .facts b{font-size:16px}
+  .hero .pin,.dive .pin{align-items:center}
+  .gcard{grid-template-columns:1fr;padding:14px;gap:14px}
+  .gc-stage{min-height:250px}
+  .gc-info{min-height:0}
+  .genemap .seg span{font-size:8px;letter-spacing:0}
+  .genemap{padding:0 16px}
+  .genemap::before{left:16px;right:16px}
+}
+@media (prefers-reduced-motion:reduce){
+  .title,.ld-bars i,.cue i::after,.hs i,.logo-mark::before,.logo-mark::after{animation:none}
+}
+</style>
+</head>
+<body>
+<div id="loader"><div class="ld-bars"><i></i><i style="animation-delay:.1s"></i><i style="animation-delay:.2s"></i><i style="animation-delay:.3s"></i><i style="animation-delay:.4s"></i><i style="animation-delay:.5s"></i><i style="animation-delay:.6s"></i></div><div class="ld-text">SEQUENCING <span id="ldPct">0</span>%</div></div>
+
+<canvas id="gl" aria-hidden="true"></canvas>
+<div class="fx scan"></div><div class="fx vig"></div><div id="flash" class="fx"></div>
+<div class="progress" id="progress"></div>
+
+<header class="hud">
+  <a class="logo" href="#top" id="logo"><span class="logo-mark"></span>GENE<b>VIEW</b></a>
+  <div class="readout"><span id="roChap">00 · INTRO</span><span id="roBp">BP 0001 / 0128</span></div>
+</header>
+<div class="ticker" id="ticker"><small>STRAND 5′→3′ / 3′→5′</small><span class="r" id="tk1"></span><span class="r" id="tk2"></span></div>
+<nav class="rail" id="rail" aria-label="Chapters"></nav>
+<div class="tip" id="tip"></div>
+
+<main id="top">
+  <section class="chap hero" data-name="Intro">
+    <div class="pin"><div class="hero-card" data-card>
+      <div class="eyebrow">// HOLOGRAPHIC GENOME EXPLORER</div>
+      <h1 class="title">GENE VIEW</h1>
+      <p class="lede">Every cell in your body carries two metres of instructions, folded into a space smaller than a speck of dust. Scroll to fly through it: strand, rung, atom, and finally the inside of a real human gene.</p>
+      <div class="cue"><span>SCROLL TO SEQUENCE</span><i></i></div>
+    </div></div>
+  </section>
+
+  <section class="chap" data-name="Double helix">
+    <div class="pin"><article class="card" data-card>
+      <div class="ch-num">01 <span>/ 11</span></div>
+      <h2>The <em>double helix</em></h2>
+      <p>Two strands wind around each other like a twisted ladder. It's a <b>right-handed</b> spiral: each full turn holds about <b>10.5 base pairs</b> and climbs <b>3.4 nanometres</b>. The whole ladder is only 2 nm wide, roughly 50,000 times thinner than a hair.</p>
+      <ul class="facts"><li><b>1953</b><span>Watson &amp; Crick, built on Rosalind Franklin's Photo 51</span></li><li><b>~2 m</b><span>of DNA packed in every human cell</span></li><li><b>3.1 bn</b><span>base pairs in one copy of your genome</span></li></ul>
+    </article></div>
+  </section>
+
+  <section class="chap" data-name="Backbone">
+    <div class="pin"><article class="card right" data-card>
+      <div class="ch-num">02 <span>/ 11</span></div>
+      <h2>The <em>sugar-phosphate</em> backbone</h2>
+      <p>The rails of the ladder alternate <b>deoxyribose sugars</b> and <b>phosphate groups</b>, locked together by strong phosphodiester bonds. Each strand has a direction, 5′→3′, and the two run in <b>opposite directions</b> (antiparallel). The phosphates are negatively charged, which is why DNA moves toward the + electrode in a gel.</p>
+      <div class="legend"><span style="--c:var(--teal)"><i></i>Strand 1 (5′→3′)</span><span style="--c:var(--blue)"><i></i>Strand 2 (3′→5′)</span></div>
+    </article></div>
+  </section>
+
+  <section class="chap" data-name="Nucleotide">
+    <div class="pin"><article class="card" data-card>
+      <div class="ch-num">03 <span>/ 11</span></div>
+      <h2>One <em>nucleotide</em></h2>
+      <p>Zoom in on one rung and you'll find the building block: <b>phosphate + sugar + base</b>. The bases come in two shapes. <b>Purines</b> (A, G) have two fused rings, a hexagon and a pentagon. <b>Pyrimidines</b> (C, T) have a single hexagon. Look for both shapes in the hologram.</p>
+      <ul class="facts"><li><b>PO₄</b><span>phosphate, links one sugar to the next</span></li><li><b>C₅</b><span>deoxyribose, a 5-sided sugar ring</span></li><li><b>A·T·G·C</b><span>the base, which carries the information</span></li></ul>
+    </article></div>
+  </section>
+
+  <section class="chap" data-name="Base pairs">
+    <div class="pin"><article class="card right" data-card>
+      <div class="ch-num">04 <span>/ 11</span></div>
+      <h2>The <em>base-pair</em> code</h2>
+      <p><b>A</b> always pairs with <b>T</b>, and <b>G</b> always pairs with <b>C</b>. A purine always meets a pyrimidine, so every rung is exactly the same width. That's why, in any DNA, the amount of A equals T and G equals C (Chargaff's rule).</p>
+      <div class="chips" id="baseChips">
+        <button class="chip on" data-b="all">All bases</button>
+        <button class="chip" data-b="A" style="--c:var(--A)"><i></i>A · Adenine</button>
+        <button class="chip" data-b="T" style="--c:var(--T)"><i></i>T · Thymine</button>
+        <button class="chip" data-b="G" style="--c:var(--G)"><i></i>G · Guanine</button>
+        <button class="chip" data-b="C" style="--c:var(--C)"><i></i>C · Cytosine</button>
+      </div>
+      <p class="hint">↳ Hover any rung in the hologram to read it.</p>
+    </article></div>
+  </section>
+
+  <section class="chap" data-name="H-bonds">
+    <div class="pin"><article class="card" data-card>
+      <div class="ch-num">05 <span>/ 11</span></div>
+      <h2><em>Hydrogen bonds</em></h2>
+      <p>The rungs are held together by hydrogen bonds, the faint dashes across the middle. <b>A–T shares 2</b> and <b>G–C shares 3</b>, so GC-rich DNA takes more heat to separate. One bond is weak, but millions together are strong. The weakness is on purpose: the cell has to unzip DNA every time it reads or copies it.</p>
+      <ul class="facts"><li><b>2</b><span>H-bonds in every A–T pair</span></li><li><b>3</b><span>H-bonds in every G–C pair</span></li><li><b>~5%</b><span>of a covalent bond's strength</span></li></ul>
+    </article></div>
+  </section>
+
+  <section class="chap" data-name="Grooves">
+    <div class="pin"><article class="card right" data-card>
+      <div class="ch-num">06 <span>/ 11</span></div>
+      <h2>Major &amp; minor <em>grooves</em></h2>
+      <p>The two backbones don't sit directly opposite each other, so the helix has a wide <b>major groove</b> (~2.2 nm) and a narrow <b>minor groove</b> (~1.2 nm). Proteins slip into the major groove and read the edges of the bases, so they can find a sequence <b>without unzipping</b> the DNA.</p>
+      <ul class="facts"><li><b>2.2 nm</b><span>major groove width</span></li><li><b>1.2 nm</b><span>minor groove width</span></li><li><b>~137°</b><span>angle between the two sugar attachments</span></li></ul>
+    </article></div>
+  </section>
+
+  <section class="chap" data-name="Replication">
+    <div class="pin"><article class="card" data-card>
+      <div class="ch-num">07 <span>/ 11</span></div>
+      <h2>Unzipping: <em>replication</em></h2>
+      <p>Watch the top of the helix split open. <b>Helicase</b> pries the strands apart at the replication fork, and <b>DNA polymerase</b> builds a new partner for each one, A for T and G for C. Every copy keeps one old strand and one new strand, which is called semiconservative replication.</p>
+      <ul class="facts"><li><b>~50</b><span>bases added per second at each fork</span></li><li><b>1 in 10⁹</b><span>error rate after proofreading</span></li><li><b>~8 h</b><span>to copy a human genome</span></li></ul>
+    </article></div>
+  </section>
+
+  <section class="chap" data-name="Packing">
+    <div class="pin"><article class="card right" data-card>
+      <div class="ch-num">08 <span>/ 11</span></div>
+      <h2>Spools: <em>nucleosomes</em></h2>
+      <p>Two metres of DNA has to fit inside a nucleus 6 µm across. The cell's trick is spools. DNA wraps <b>1.65 times</b> around a core of <b>8 histone proteins</b>, about 147 base pairs per spool. Strung together they look like beads on a string, then coil tighter into chromatin.</p>
+      <ul class="facts"><li><b>147 bp</b><span>wrapped per nucleosome</span></li><li><b>8</b><span>histones in each core</span></li><li><b>~30 M</b><span>nucleosomes in one cell</span></li></ul>
+    </article></div>
+  </section>
+
+  <section class="chap" data-name="Chromosome">
+    <div class="pin"><article class="card" data-card>
+      <div class="ch-num">09 <span>/ 11</span></div>
+      <h2>The <em>chromosome</em></h2>
+      <p>Before a cell divides, chromatin condenses about <b>10,000×</b> into chromosomes. You have <b>23 pairs</b>. Each one has already been copied into two identical <b>sister chromatids</b>, joined at the centromere, which gives the classic X shape. The stripes are G-bands, regions that pack differently.</p>
+      <ul class="facts"><li><b>46</b><span>chromosomes per human cell</span></li><li><b>2</b><span>sister chromatids per X</span></li><li><b>1</b><span>centromere pinching them together</span></li></ul>
+    </article></div>
+  </section>
+
+  <section class="chap" data-name="The gene">
+    <div class="pin"><article class="card right" data-card>
+      <div class="ch-num">10 <span>/ 11</span></div>
+      <h2>What is a <em>gene</em>?</h2>
+      <p>A gene is a stretch of DNA that holds the recipe for one product, usually a protein. Humans have about <b>20,000</b> protein-coding genes, yet together they make up only <b>~1.5%</b> of the genome. The glowing section of the helix is one gene, <b>HBB</b>, which builds part of the hemoglobin in your blood. Keep scrolling to go inside it.</p>
+    </article></div>
+  </section>
+
+  <section class="chap dive" data-name="Dive">
+    <div class="pin"><div class="dive-card" data-card>
+      <div class="eyebrow">// LOCUS 11p15.4 · CHROMOSOME 11</div>
+      <h2 class="dive-h">ENTERING<br>THE GENE</h2>
+      <p>Target: <b>HBB</b>, the gene for β-globin</p>
+    </div></div>
+  </section>
+
+  <section id="explorer" data-name="Gene explorer">
+    <div class="ex-head">
+      <div><div class="eyebrow">// 11 · GENE EXPLORER · HBB</div><h2>Inside a gene: <em>HBB</em></h2></div>
+      <p>This is the real human gene for β-globin. Swipe, drag, or use the ← → keys to walk it from the switch upstream to the finished protein. Tap any glowing tag to look closer.</p>
+    </div>
+    <div class="genemap" id="genemap"></div>
+    <div class="track" id="track"></div>
+    <div class="ex-nav"><button class="navb" id="prev" aria-label="Previous part">←</button><span id="exCount">01 / 10</span><button class="navb" id="next" aria-label="Next part">→</button></div>
+    <div class="swipe-hint">⟵ SWIPE ⟶</div>
+    <footer>GENE VIEW · made for Hack Club · scroll back up to fly the helix again</footer>
+  </section>
+</main>
+<noscript><p style="position:fixed;bottom:20px;left:20px;z-index:99;color:#dcfff7">Gene View needs JavaScript for its 3D hologram.</p></noscript>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+<script>
+(() => {
+'use strict';
+/* ================= helpers ================= */
+const TAU = Math.PI * 2;
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+const lerp = (a, b, t) => a + (b - a) * t;
+const sm = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const SNAP = /[?&]snap/.test(location.search);
+
+const PAL = { A: '#29f5a6', T: '#22b8ff', U: '#22b8ff', G: '#c6ff4d', C: '#8a7dff', teal: '#19e6c1', cyan: '#2ee6ff', blue: '#2a8cff', ink: '#dcfff7', warn: '#ff5f7e', fe: '#ffd27a' };
+const COMP = { A: 'T', T: 'A', G: 'C', C: 'G', U: 'A' };
+const NAME = { A: 'Adenine', T: 'Thymine', G: 'Guanine', C: 'Cytosine' };
+const BIDX = { A: 0, T: 1, G: 2, C: 3 };
+
+/* ================= DNA model ================= */
+const R = 2.0, RISE = 0.62, BPT = 10.5, NBP = 128, TW = TAU / BPT, GROOVE = 2.4, Y0 = -(NBP - 1) * RISE / 2;
+const GENE_I0 = 74, GENE_I1 = 104;
+const GA = Y0 + GENE_I0 * RISE, GB = Y0 + GENE_I1 * RISE, GC = (GA + GB) / 2;
+const SEQ = [];
+{ const r = rng(11); for (let i = 0; i < NBP; i++) SEQ.push('ATGC'[Math.floor(r() * 4)]);
+  const hbb = 'ATGGTGCACCTGACTCCTGAGGAGAAGTCT'; for (let i = 0; i < hbb.length; i++) SEQ[GENE_I0 + i] = hbb[i]; }
+
+/* ================= loader ================= */
+const loader = document.getElementById('loader'), ldPct = document.getElementById('ldPct');
+let ldv = 0; const ldTimer = setInterval(() => { ldv = Math.min(96, ldv + 3 + Math.random() * 9); ldPct.textContent = Math.floor(ldv); }, 60);
+function loaded() { clearInterval(ldTimer); ldPct.textContent = '100'; setTimeout(() => loader.classList.add('done'), 250); }
+
+/* ================= DOM: chapters ================= */
+const sections = [...document.querySelectorAll('main > section')];
+const cards = sections.map(s => s.querySelector('[data-card]'));
+const CH_NAMES = sections.map(s => s.dataset.name);
+const rail = document.getElementById('rail');
+sections.forEach((s, i) => {
+  const b = document.createElement('button');
+  b.innerHTML = `<span>${String(i).padStart(2, '0')} · ${CH_NAMES[i]}</span><i></i>`;
+  b.setAttribute('aria-label', 'Go to ' + CH_NAMES[i]);
+  b.onclick = () => scrollToChapter(i);
+  rail.appendChild(b);
+});
+const railBtns = [...rail.children];
+let centers = [];
+function measure() { centers = sections.map(s => { const r = s.getBoundingClientRect(); return r.top + scrollY + (s.id === 'explorer' ? innerHeight / 2 : r.height / 2); }); }
+function scrollToChapter(i) { measure(); window.scrollTo({ top: centers[i] - innerHeight / 2, behavior: 'smooth' }); }
+document.getElementById('logo').onclick = e => { e.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+function computeF() {
+  const vc = scrollY + innerHeight / 2;
+  if (vc <= centers[0]) return 0;
+  for (let i = 0; i < centers.length - 1; i++) if (vc < centers[i + 1]) return i + (vc - centers[i]) / (centers[i + 1] - centers[i]);
+  return centers.length - 1;
+}
+
+/* ================= THREE scene ================= */
+const canvas = document.getElementById('gl');
+let renderer, composer, bloom, finalPass, scene, camera, ok3d = true;
+try {
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+} catch (e) { ok3d = false; }
+const U = {
+  uTime: { value: 0 }, uFork: { value: 99 }, uUnzip: { value: 0 }, uFocusY: { value: 0 }, uFocus: { value: 0 },
+  uGeneA: { value: GA }, uGeneB: { value: GB }, uGene: { value: 0 }, uHover: { value: -9 },
+  uFilter: { value: null }, uPx: { value: 1 }
+};
+const COMMON = `
+uniform float uTime; uniform float uFork; uniform float uUnzip; uniform float uFocusY; uniform float uFocus;
+uniform float uGeneA; uniform float uGeneB; uniform float uGene; uniform float uI; uniform float uHover; uniform vec4 uFilter;
+float unzipK(float y){ return uUnzip * smoothstep(uFork, uFork + 6.0, y); }
+vec3 unzipP(vec3 p, float side, float y){ float k = unzipK(y); p.x += side * k * (2.4 + 0.09 * max(y - uFork, 0.0)); p.z += side * k * 0.8; return p; }
+float weightY(float y){
+  float f = mix(1.0, 0.1 + 1.6 * exp(-pow((y - uFocusY) / 2.2, 2.0)), uFocus);
+  float g = smoothstep(uGeneA - 0.6, uGeneA + 0.6, y) * (1.0 - smoothstep(uGeneB - 0.6, uGeneB + 0.6, y));
+  return f * mix(1.0, 0.2 + 1.7 * g, uGene);
+}
+float baseFilter(float b){ if (b > 3.5) return 1.0; return b < 0.5 ? uFilter.x : (b < 1.5 ? uFilter.y : (b < 2.5 ? uFilter.z : uFilter.w)); }
+`;
+const MESH_VS = COMMON + `
+uniform vec3 uColor; uniform float uSide;
+attribute float aSide; attribute vec3 aColor; attribute float aBase; attribute float aBp;
+varying vec3 vN; varying vec3 vV; varying float vW; varying vec3 vC; varying float vWY; varying float vHL;
+void main(){
+  vec4 p = vec4(position, 1.0); vec3 n = normal; float side = uSide; float yy; vec3 col = uColor; float w = 1.0; vHL = 0.0;
+  #ifdef USE_INSTANCING
+    p = instanceMatrix * p; n = mat3(instanceMatrix) * n; yy = instanceMatrix[3].y;
+    #ifdef INST_ATTR
+      side = aSide; col = aColor; w *= baseFilter(aBase); vHL = step(abs(aBp - uHover), 0.5);
+    #endif
+  #else
+    yy = p.y;
+  #endif
+  #ifndef PLAIN
+    p.xyz = unzipP(p.xyz, side, yy); w *= weightY(yy);
+  #endif
+  vec4 wp = modelMatrix * p;
+  vN = normalize(mat3(modelMatrix) * n); vV = normalize(cameraPosition - wp.xyz);
+  vW = w; vC = col; vWY = yy;
+  gl_Position = projectionMatrix * viewMatrix * wp;
+}`;
+const MESH_FS = COMMON + `
+varying vec3 vN; varying vec3 vV; varying float vW; varying vec3 vC; varying float vWY; varying float vHL;
+void main(){
+  float fr = pow(1.0 - abs(dot(normalize(vN), normalize(vV))), 1.5);
+  float scan = 0.72 + 0.28 * sin(vWY * 26.0 - uTime * 5.0);
+  float pulse = pow(0.5 + 0.5 * sin(vWY * 0.42 - uTime * 1.8), 8.0);
+  vec3 c = vC * (0.25 + 1.3 * fr) * scan + vC * pulse * 0.7 + vec3(0.7, 1.0, 0.95) * vHL * 0.9;
+  float a = (0.3 + 0.9 * fr) * uI * vW * (1.0 + vHL * 1.8);
+  gl_FragColor = vec4(c * a, 1.0);
+}`;
+const LINE_VS = COMMON + `
+attribute vec3 aColor; attribute float aSide; attribute float aBase; attribute float aBp; attribute float aFade;
+varying vec3 vC; varying float vA;
+void main(){
+  vec3 p = position; float yy = p.y; float w = 1.0;
+  #ifndef PLAIN
+    w = weightY(yy) * baseFilter(aBase) * (1.0 - unzipK(yy) * aFade) * (1.0 + 1.8 * step(abs(aBp - uHover), 0.5));
+    p = unzipP(p, aSide, yy);
+  #endif
+  vC = aColor; vA = uI * w * (0.75 + 0.25 * sin(uTime * 3.0 + yy * 2.0));
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+}`;
+const LINE_FS = `varying vec3 vC; varying float vA; void main(){ gl_FragColor = vec4(vC * vA, 1.0); }`;
+const PTS_VS = COMMON + `
+uniform float uPx;
+attribute vec3 aColor; attribute float aSize; attribute float aSide; attribute float aBase; attribute float aPh;
+varying vec3 vC; varying float vA;
+void main(){
+  vec3 p = position; float yy = p.y; float w = 1.0;
+  #ifndef PLAIN
+    w = weightY(yy) * baseFilter(aBase); p = unzipP(p, aSide, yy);
+  #endif
+  #ifdef DRIFT
+    p += vec3(sin(uTime * 0.3 + aPh), cos(uTime * 0.25 + aPh * 1.3), sin(uTime * 0.2 + aPh * 0.7)) * 0.6;
+  #endif
+  vec4 mv = modelViewMatrix * vec4(p, 1.0);
+  gl_PointSize = min(aSize * uPx * (260.0 / max(-mv.z, 0.1)), 40.0 * uPx);
+  gl_Position = projectionMatrix * mv;
+  vC = aColor; vA = uI * w * (0.55 + 0.45 * sin(uTime * 2.2 + aPh)) * smoothstep(0.4, 1.6, -mv.z);
+}`;
+const PTS_FS = `varying vec3 vC; varying float vA; void main(){ float d = length(gl_PointCoord - 0.5); if (d > 0.5) discard; float a = pow(1.0 - d * 2.0, 2.0); gl_FragColor = vec4(vC * a * vA, 1.0); }`;
+
+const mats = {};
+function U2(extra) { return Object.assign({}, U, extra); }
+function baseMat(vs, fs, uniforms, defines) {
+  return new THREE.ShaderMaterial({ uniforms, vertexShader: vs, fragmentShader: fs, defines: defines || {}, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+}
+const meshMat = (color, side = 0, defines) => baseMat(MESH_VS, MESH_FS, U2({ uI: { value: 1 }, uColor: { value: new THREE.Color(color) }, uSide: { value: side } }), defines);
+const lineMat = defines => baseMat(LINE_VS, LINE_FS, U2({ uI: { value: 1 } }), defines);
+const ptsMat = defines => baseMat(PTS_VS, PTS_FS, U2({ uI: { value: 1 } }), defines);
+function bufGeo(o) {
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(o.pos, 3));
+  if (o.col) g.setAttribute('aColor', new THREE.Float32BufferAttribute(o.col, 3));
+  for (const k of ['side', 'base', 'bp', 'fade', 'size', 'ph']) if (o[k]) g.setAttribute('a' + k[0].toUpperCase() + k.slice(1), new THREE.Float32BufferAttribute(o[k], 1));
+  return g;
+}
+
+let helix, chromatin, chromo, dust, warp, scanner, rods, KF, hoverTargets = [];
+const V3 = THREE.Vector3;
+
+function buildScene() {
+  U.uFilter.value = new THREE.Vector4(1, 1, 1, 1);
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.05, 400);
+  camera.position.set(0, 0, 42);
+  scene.add(camera);
+  renderer.setClearColor(0x01070d, 1);
+  helix = new THREE.Group(); helix.rotation.order = 'ZYX'; scene.add(helix);
+
+  const sp = (i, side) => { const a = i * TW + (side ? GROOVE : 0); return new V3(R * Math.cos(a), Y0 + i * RISE, -R * Math.sin(a)); };
+  class StrandCurve extends THREE.Curve {
+    constructor(side) { super(); this.side = side; }
+    getPoint(u, t = new V3()) { const i = -0.7 + u * (NBP - 1 + 1.4); const a = i * TW + (this.side ? GROOVE : 0); return t.set(R * Math.cos(a), Y0 + i * RISE, -R * Math.sin(a)); }
+  }
+  // backbone tubes
+  mats.bb = [meshMat(PAL.teal, 1), meshMat(PAL.blue, -1)];
+  [0, 1].forEach(s => helix.add(new THREE.Mesh(new THREE.TubeGeometry(new StrandCurve(s), NBP * 10, 0.1, 10, false), mats.bb[s])));
+
+  const up = new V3(0, 1, 0);
+  const BCOL = { A: new THREE.Color(PAL.A), T: new THREE.Color(PAL.T), G: new THREE.Color(PAL.G), C: new THREE.Color(PAL.C) };
+  const cWhite = new THREE.Color('#e8fffb'), cSugar = new THREE.Color('#5fe9ff'), cHb = new THREE.Color('#d8fff6');
+  const strandCol = [new THREE.Color(PAL.teal), new THREE.Color(PAL.blue)];
+  const L = { pos: [], col: [], side: [], base: [], bp: [], fade: [] };
+  const H = { pos: [], col: [], side: [], base: [], bp: [], fade: [] };
+  const P = { pos: [], col: [], size: [], side: [], base: [], ph: [] };
+  const seg = (T, a, b, c, side, base, bp, fade = 0) => { T.pos.push(a.x, a.y, a.z, b.x, b.y, b.z); for (let k = 0; k < 2; k++) { T.col.push(c.r, c.g, c.b); T.side.push(side); T.base.push(base); T.bp.push(bp); T.fade.push(fade); } };
+  const pt = (p, c, size, side, base) => { P.pos.push(p.x, p.y, p.z); P.col.push(c.r, c.g, c.b); P.size.push(size); P.side.push(side); P.base.push(base); P.ph.push(Math.random() * TAU); };
+
+  const rodGeo = new THREE.CylinderGeometry(0.055, 0.055, 1, 6, 1, true);
+  const rodCount = NBP * 2;
+  rods = new THREE.InstancedMesh(rodGeo, meshMat('#ffffff', 0, { INST_ATTR: '' }), rodCount);
+  const rSide = new Float32Array(rodCount), rCol = new Float32Array(rodCount * 3), rBase = new Float32Array(rodCount), rBp = new Float32Array(rodCount);
+  const phosGeo = new THREE.IcosahedronGeometry(0.16, 1);
+  const phos = new THREE.InstancedMesh(phosGeo, meshMat('#ffffff', 0, { INST_ATTR: '' }), rodCount);
+  const pSide = new Float32Array(rodCount), pCol = new Float32Array(rodCount * 3), pBase = new Float32Array(rodCount).fill(4), pBp = new Float32Array(rodCount).fill(-99);
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new V3();
+  const deg = d => d * Math.PI / 180;
+
+  for (let i = 0; i < NBP; i++) {
+    const PA = sp(i, 0), PB = sp(i, 1), M = PA.clone().add(PB).multiplyScalar(0.5);
+    const bA = SEQ[i], bB = COMP[bA];
+    [[PA, bA, 1, 0], [PB, bB, -1, 1]].forEach(([Pp, b, side, si]) => {
+      const u = M.clone().sub(Pp); const half = u.length(); u.normalize();
+      const w = new V3().crossVectors(u, up).normalize();
+      const col = BCOL[b], bi = BIDX[b], id = i * 2 + si;
+      // rod
+      const a = Pp.clone().addScaledVector(u, 0.3), e = M.clone().addScaledVector(u, -0.2);
+      q.setFromUnitVectors(up, u); sc.set(1, a.distanceTo(e), 1);
+      m4.compose(a.clone().add(e).multiplyScalar(0.5), q, sc); rods.setMatrixAt(id, m4);
+      rSide[id] = side; rCol.set([col.r, col.g, col.b], id * 3); rBase[id] = bi; rBp[id] = i;
+      // phosphate
+      m4.compose(Pp, q.identity(), sc.set(1, 1, 1)); phos.setMatrixAt(id, m4);
+      pSide[id] = side; const sc2 = strandCol[si]; pCol.set([sc2.r, sc2.g, sc2.b], id * 3);
+      pt(Pp, cWhite, 1.6, side, 4);
+      // ring
+      const rr = 0.2, hc = Pp.clone().addScaledVector(u, half - 0.36);
+      const vtx = (c, ang, r) => c.clone().addScaledVector(u, Math.cos(ang) * r).addScaledVector(w, Math.sin(ang) * r);
+      const purine = b === 'A' || b === 'G';
+      let gly; const ring = [];
+      if (purine) {
+        const hex = [30, 90, 150, 210, 270, 330].map(d => vtx(hc, deg(d), rr));
+        for (let k = 0; k < 6; k++) ring.push([hex[k], hex[(k + 1) % 6]]);
+        const cp = hc.clone().addScaledVector(u, -(rr * Math.cos(deg(30)) + 0.688 * rr));
+        const pent = [36, 108, 180, 252, 324].map(d => vtx(cp, deg(d), 0.851 * rr));
+        for (let k = 0; k < 4; k++) ring.push([pent[k], pent[k + 1]]);
+        gly = pent[2];
+        hex.forEach(p => pt(p, col, 0.75, side, bi)); pent.slice(1, 4).forEach(p => pt(p, col, 0.75, side, bi));
+        [hex[1], hex[4]].forEach(v => { const d = v.clone().sub(hc).normalize(); const e2 = v.clone().addScaledVector(d, 0.14); ring.push([v, e2]); pt(e2, cWhite, 0.6, side, bi); });
+      } else {
+        const hex = [0, 60, 120, 180, 240, 300].map(d => vtx(hc, deg(d), rr));
+        for (let k = 0; k < 6; k++) ring.push([hex[k], hex[(k + 1) % 6]]);
+        gly = hex[3];
+        hex.forEach(p => pt(p, col, 0.75, side, bi));
+        [hex[1], hex[5]].forEach(v => { const d = v.clone().sub(hc).normalize(); const e2 = v.clone().addScaledVector(d, 0.14); ring.push([v, e2]); pt(e2, cWhite, 0.6, side, bi); });
+      }
+      ring.forEach(([x, y]) => seg(L, x, y, col, side, bi, i));
+      // sugar pentagon
+      const T = sp(i + 0.02, si).sub(sp(i, si)).normalize(); const tN = T.clone().addScaledVector(u, -T.dot(u)).normalize();
+      const scn = Pp.clone().addScaledVector(u, 0.45);
+      const sug = [0, 72, 144, 216, 288].map(d => scn.clone().addScaledVector(u, Math.cos(deg(d)) * 0.15).addScaledVector(tN, Math.sin(deg(d)) * 0.15));
+      for (let k = 0; k < 5; k++) seg(L, sug[k], sug[(k + 1) % 5], cSugar, side, 4, i);
+      sug.forEach(p => pt(p, cSugar, 0.45, side, 4));
+      seg(L, sug[0], gly, col, side, bi, i);
+      seg(L, Pp, sug[2], cSugar, side, 4, i);
+    });
+    // hydrogen bonds
+    const uAB = PB.clone().sub(PA).normalize(), w = new V3().crossVectors(uAB, up).normalize();
+    const n = (bA === 'A' || bA === 'T') ? 2 : 3;
+    const offs = n === 2 ? [-0.07, 0.07] : [-0.11, 0, 0.11];
+    offs.forEach(o => {
+      const c = M.clone().addScaledVector(w, o);
+      [[-0.17, -0.1], [-0.035, 0.035], [0.1, 0.17]].forEach(([a, b]) => seg(H, c.clone().addScaledVector(uAB, a), c.clone().addScaledVector(uAB, b), cHb, 0, 4, i, 1));
+    });
+  }
+  rodGeo.setAttribute('aSide', new THREE.InstancedBufferAttribute(rSide, 1));
+  rodGeo.setAttribute('aColor', new THREE.InstancedBufferAttribute(rCol, 3));
+  rodGeo.setAttribute('aBase', new THREE.InstancedBufferAttribute(rBase, 1));
+  rodGeo.setAttribute('aBp', new THREE.InstancedBufferAttribute(rBp, 1));
+  phosGeo.setAttribute('aSide', new THREE.InstancedBufferAttribute(pSide, 1));
+  phosGeo.setAttribute('aColor', new THREE.InstancedBufferAttribute(pCol, 3));
+  phosGeo.setAttribute('aBase', new THREE.InstancedBufferAttribute(pBase, 1));
+  phosGeo.setAttribute('aBp', new THREE.InstancedBufferAttribute(pBp, 1));
+  helix.add(rods, phos);
+  mats.rods = rods.material; mats.phos = phos.material;
+  mats.lines = lineMat(); helix.add(new THREE.LineSegments(bufGeo(L), mats.lines));
+  mats.hb = lineMat(); helix.add(new THREE.LineSegments(bufGeo(H), mats.hb));
+  mats.atoms = ptsMat(); helix.add(new THREE.Points(bufGeo(P), mats.atoms));
+  hoverTargets = [rods];
+
+  // electron cloud
+  { const C = { pos: [], col: [], size: [], side: [], base: [], ph: [] }; const r = rng(3);
+    for (let n = 0; n < 7000; n++) {
+      const i = r() * (NBP - 1), s = r() < 0.5 ? 0 : 1, c = sp(i, s);
+      const d = new V3(r() - 0.5, r() - 0.5, r() - 0.5).normalize().multiplyScalar(0.12 + Math.pow(r(), 2) * 0.6);
+      c.add(d); C.pos.push(c.x, c.y, c.z);
+      const col = strandCol[s].clone().lerp(cWhite, r() * 0.4); C.col.push(col.r, col.g, col.b);
+      C.size.push(0.18 + r() * 0.35); C.side.push(s ? -1 : 1); C.base.push(4); C.ph.push(r() * TAU);
+    }
+    mats.cloud = ptsMat(); helix.add(new THREE.Points(bufGeo(C), mats.cloud)); }
+
+  // scanner rings
+  { const S = { pos: [], col: [] }; const c1 = new THREE.Color(PAL.cyan);
+    const ringAt = (rad, y, n, tick) => { for (let k = 0; k < n; k++) { const a0 = k / n * TAU, a1 = (k + 1) / n * TAU; S.pos.push(rad * Math.cos(a0), y, rad * Math.sin(a0), rad * Math.cos(a1), y, rad * Math.sin(a1)); S.col.push(c1.r, c1.g, c1.b, c1.r, c1.g, c1.b);
+      if (tick && k % 4 === 0) { S.pos.push(rad * Math.cos(a0), y, rad * Math.sin(a0), (rad + 0.25) * Math.cos(a0), y, (rad + 0.25) * Math.sin(a0)); S.col.push(c1.r, c1.g, c1.b, c1.r, c1.g, c1.b); } } };
+    ringAt(3.0, 0, 96, true); ringAt(3.4, 0.12, 64, false); ringAt(3.4, -0.12, 64, false);
+    mats.scan = lineMat({ PLAIN: '' }); scanner = new THREE.LineSegments(bufGeo(S), mats.scan); helix.add(scanner); }
+
+  // chromatin / nucleosomes
+  chromatin = new THREE.Group(); scene.add(chromatin);
+  { const N = 10, pts = [], oct = [], r = rng(5); const T = { pos: [], col: [] }; const ct = new THREE.Color('#9fa8ff');
+    for (let k = 0; k < N; k++) {
+      const ang = k * 2.4, c = new V3(6 * Math.cos(ang), (k - (N - 1) / 2) * 2.4, 6 * Math.sin(ang));
+      const ax = new V3(Math.cos(ang), 0, Math.sin(ang)), e1 = new V3(0, 1, 0), e2 = new V3().crossVectors(ax, e1);
+      for (let j = 0; j <= 36; j++) { const u = j / 36, th = u * 1.65 * TAU + k * 0.9; pts.push(c.clone().addScaledVector(e1, Math.cos(th) * 1.45).addScaledVector(e2, Math.sin(th) * 1.45).addScaledVector(ax, -0.5 + u)); }
+      for (let m = 0; m < 8; m++) { const ph = deg(45 + 90 * (m % 4)); oct.push(c.clone().addScaledVector(e1, Math.cos(ph) * 0.6).addScaledVector(e2, Math.sin(ph) * 0.6).addScaledVector(ax, m < 4 ? -0.36 : 0.36)); }
+      for (let m = 0; m < 8; m++) { let p = c.clone().add(new V3(r() - .5, r() - .5, r() - .5).normalize().multiplyScalar(1.0)); for (let s = 0; s < 4; s++) { const p2 = p.clone().add(new V3(r() - .5, r() - .5, r() - .5).multiplyScalar(0.7)).addScaledVector(p.clone().sub(c).normalize(), 0.3); T.pos.push(p.x, p.y, p.z, p2.x, p2.y, p2.z); T.col.push(ct.r, ct.g, ct.b, ct.r, ct.g, ct.b); p = p2; } }
+    }
+    const curve = new THREE.CatmullRomCurve3(pts);
+    mats.nucDNA = meshMat(PAL.teal, 0, { PLAIN: '' });
+    chromatin.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 1600, 0.17, 8, false), mats.nucDNA));
+    const og = new THREE.IcosahedronGeometry(0.6, 2);
+    mats.hist = meshMat('#7d6bff', 0, { PLAIN: '' });
+    const im = new THREE.InstancedMesh(og, mats.hist, oct.length); oct.forEach((p, i) => { m4.compose(p, q.identity(), sc.set(1, 1, 1)); im.setMatrixAt(i, m4); }); chromatin.add(im);
+    mats.tails = lineMat({ PLAIN: '' }); chromatin.add(new THREE.LineSegments(bufGeo(T), mats.tails));
+    const C = { pos: [], col: [], size: [], ph: [] }; const cc = new THREE.Color(PAL.teal);
+    for (let n = 0; n < 4000; n++) { const p = curve.getPoint(r()).add(new V3(r() - .5, r() - .5, r() - .5).multiplyScalar(0.9)); C.pos.push(p.x, p.y, p.z); C.col.push(cc.r, cc.g, cc.b); C.size.push(0.2 + r() * 0.3); C.ph.push(r() * TAU); }
+    mats.nucPts = ptsMat({ PLAIN: '' }); chromatin.add(new THREE.Points(bufGeo(C), mats.nucPts));
+  }
+
+  // chromosome
+  chromo = new THREE.Group(); scene.add(chromo);
+  { const C = { pos: [], col: [], size: [], ph: [] }; const r = rng(9); const g = () => (r() + r() + r() - 1.5) * 0.8;
+    const ca = new THREE.Color(PAL.teal), cb = new THREE.Color(PAL.blue), cw = new THREE.Color('#eafffb');
+    for (let n = 0; n < 16000; n++) {
+      const c = r() < 0.5 ? -1 : 1, upArm = r() < 0.56, len = upArm ? 13 : 9.5, s = r() * len, dir = upArm ? 1 : -1;
+      const px = c * (1.2 + 0.32 * s), py = dir * s * 0.95;
+      const taper = Math.sqrt(Math.max(0, 1 - Math.pow(s / len, 6))) * (0.35 + 0.65 * sm(0, 2.2, s));
+      const coil = r() < 0.6; const th = coil ? s * 2.6 + (r() - .5) * 0.9 : r() * TAU; const rr = coil ? 1.45 * taper + g() * 0.22 : Math.sqrt(r()) * 1.8 * taper;
+      C.pos.push(px + Math.cos(th) * rr, py + g() * 0.2, Math.sin(th) * rr);
+      const band = 0.4 + 0.6 * (Math.sin(s * 1.9 + c * 0.5 + (upArm ? 0 : 1.3)) > -0.2 ? 1 : 0.25);
+      const col = (c < 0 ? ca : cb).clone().lerp(cw, r() * 0.25).multiplyScalar(band);
+      C.col.push(col.r, col.g, col.b); C.size.push(0.35 + r() * 0.55); C.ph.push(r() * TAU);
+    }
+    for (let n = 0; n < 500; n++) { C.pos.push(g() * 0.9, g() * 0.6, g() * 0.9); C.col.push(cw.r, cw.g, cw.b); C.size.push(0.5); C.ph.push(r() * TAU); }
+    mats.chr = ptsMat({ PLAIN: '' }); chromo.add(new THREE.Points(bufGeo(C), mats.chr)); }
+
+  // dust
+  { const D = { pos: [], col: [], size: [], ph: [] }; const r = rng(1); const c = new THREE.Color('#3fb8c8');
+    for (let n = 0; n < 2600; n++) { const v = new V3(r() - .5, r() - .5, r() - .5).normalize().multiplyScalar(18 + r() * 80); D.pos.push(v.x, v.y, v.z); D.col.push(c.r, c.g, c.b); D.size.push(0.6 + r() * 1.4); D.ph.push(r() * TAU); }
+    mats.dust = ptsMat({ PLAIN: '', DRIFT: '' }); dust = new THREE.Points(bufGeo(D), mats.dust); scene.add(dust); }
+
+  // warp streaks (camera space)
+  { const n = 900, pos = new Float32Array(n * 6), col = new Float32Array(n * 6), data = []; const r = rng(4);
+    for (let k = 0; k < n; k++) { const a = r() * TAU, rad = 0.7 + Math.pow(r(), 0.6) * 7; data.push({ x: Math.cos(a) * rad, y: Math.sin(a) * rad, z: -r() * 80, v: 20 + r() * 40 });
+      const c = new THREE.Color(r() < 0.5 ? PAL.teal : PAL.cyan); col.set([c.r, c.g, c.b, c.r * .2, c.g * .2, c.b * .2], k * 6); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    warp = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false }));
+    warp.userData = data; warp.frustumCulled = false; camera.add(warp); }
+
+  // post
+  if (THREE.EffectComposer && THREE.UnrealBloomPass) {
+    composer = new THREE.EffectComposer(renderer);
+    composer.addPass(new THREE.RenderPass(scene, camera));
+    bloom = new THREE.UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.95, 0.55, 0.0);
+    composer.addPass(bloom);
+    finalPass = new THREE.ShaderPass({
+      uniforms: { tDiffuse: { value: null }, uAmt: { value: 0.012 }, uTime: { value: 0 } },
+      vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
+      fragmentShader: `uniform sampler2D tDiffuse; uniform float uAmt; uniform float uTime; varying vec2 vUv;
+        void main(){ vec2 d = vUv - 0.5; float r = dot(d, d); vec2 off = d * uAmt * (0.4 + r * 3.0);
+          vec3 c = vec3(texture2D(tDiffuse, vUv + off).r, texture2D(tDiffuse, vUv).g, texture2D(tDiffuse, vUv - off).b);
+          float n = fract(sin(dot(vUv * vec2(1733.0, 977.0) + uTime, vec2(12.9898, 78.233))) * 43758.5453);
+          c += (n - 0.5) * 0.03; gl_FragColor = vec4(c, 1.0); }`
+    });
+    composer.addPass(finalPass);
+  }
+
+  // keyframes (one per section)
+  const D = { cam: [0, 0, 42], look: [0, 0, 0], tilt: 0, spin: .15, bb: 1, rods: .8, lines: 1, hb: .7, atoms: .9, cloud: 1, scan: .5, nuc: 0, chr: 0, focus: 0, fy: 0, gene: 0, unzip: 0, warp: 0 };
+  const K = o => Object.assign({}, D, o);
+  KF = [
+    K({ cam: [-11, -3, 40], look: [-8.5, 0, 0], tilt: .42, spin: .28, scan: .8 }),
+    K({ cam: [13, 3, 24], look: [0, 1, 0], tilt: .18, spin: .18 }),
+    K({ cam: [8, 12.5, 10], look: [0, 10, 0], spin: .12, bb: 1.8, rods: .12, lines: .3, hb: .1, atoms: .7, cloud: 1.4 }),
+    K({ cam: [5.6, 1.8, 6.4], look: [-0.6, 0.3, 0], spin: .06, focus: 1, fy: 0, lines: 1.5, atoms: 1.1, rods: .45, cloud: .25, scan: .7, bb: .8 }),
+    K({ cam: [5, 15, 12], look: [3.4, 4, 0], spin: .1, rods: 1.5, lines: 1.1, bb: .45, cloud: .3, atoms: .8 }),
+    K({ cam: [2.4, 1.3, 4.6], look: [-0.8, 0.1, 0], spin: .05, focus: .75, fy: 0, hb: 2.6, lines: 1.1, rods: .35, cloud: .15, scan: .2, atoms: .6, bb: .7 }),
+    K({ cam: [21, 2, 5], look: [0, 0, 0], spin: .1, cloud: .45, bb: 1.4, scan: .3 }),
+    K({ cam: [-14, 27, 24], look: [-5, 23, 0], spin: .03, unzip: 1, scan: 0 }),
+    K({ cam: [5, 2, 30], look: [5, 0, 0], bb: 0, rods: 0, lines: 0, hb: 0, atoms: 0, cloud: 0, scan: 0, nuc: 1 }),
+    K({ cam: [-7, 1, 46], look: [-7, 0, 0], bb: 0, rods: 0, lines: 0, hb: 0, atoms: 0, cloud: 0, scan: 0, chr: 1 }),
+    K({ cam: [12, GC + 3, 17], look: [0, GC, 0], spin: .08, gene: 1, scan: 0 }),
+    K({ cam: [0, GC - 9, 0.001], look: [0, GC + 30, 0], spin: .04, gene: 0, warp: 1, scan: 0, bb: .22, rods: .16, lines: .3, hb: .15, atoms: .12, cloud: .12 }),
+    K({ cam: [0, GC + 6, 0.001], look: [0, GC + 45, 0], spin: .03, gene: 0, warp: .3, scan: 0, bb: .12, rods: .08, lines: .15, hb: .05, atoms: .06, cloud: .08 })
+  ];
+}
+
+function sampleKF(f) {
+  const i = clamp(Math.floor(f), 0, KF.length - 1), j = Math.min(KF.length - 1, i + 1);
+  const t = sm(0.04, 0.96, f - i), a = KF[i], b = KF[j], o = {};
+  for (const k in a) o[k] = Array.isArray(a[k]) ? a[k].map((v, n) => lerp(v, b[k][n], t)) : lerp(a[k], b[k], t);
+  return o;
+}
+
+/* ================= interaction: base filter + hover ================= */
+const filterTarget = [1, 1, 1, 1];
+document.querySelectorAll('#baseChips .chip').forEach(btn => btn.addEventListener('click', () => {
+  document.querySelectorAll('#baseChips .chip').forEach(b => b.classList.toggle('on', b === btn));
+  const b = btn.dataset.b;
+  for (let k = 0; k < 4; k++) filterTarget[k] = b === 'all' ? 1 : ('ATGC'[k] === b ? 1.8 : 0.08);
+}));
+const tip = document.getElementById('tip');
+const mouse = { x: 0, y: 0, nx: 0, ny: 0, moved: false, over: false };
+addEventListener('pointermove', e => { mouse.x = e.clientX; mouse.y = e.clientY; mouse.nx = e.clientX / innerWidth * 2 - 1; mouse.ny = -(e.clientY / innerHeight * 2 - 1); mouse.moved = true; mouse.over = e.target === canvas; }, { passive: true });
+const ray = ok3d ? new THREE.Raycaster() : null;
+function doHover(k) {
+  if (!mouse.moved) return; mouse.moved = false;
+  if (!mouse.over || k.rods < 0.35 || fs > 10.6 || matchMedia('(hover: none)').matches) { U.uHover.value = -9; tip.classList.remove('on'); return; }
+  ray.setFromCamera({ x: mouse.nx, y: mouse.ny }, camera);
+  const hit = ray.intersectObject(rods, false)[0];
+  if (!hit) { U.uHover.value = -9; tip.classList.remove('on'); return; }
+  const i = Math.floor(hit.instanceId / 2), a = SEQ[i], b = COMP[a], hb = (a === 'A' || a === 'T') ? 2 : 3;
+  U.uHover.value = i;
+  const inGene = i >= GENE_I0 && i < GENE_I1;
+  tip.innerHTML = `<span class="k">BASE PAIR ${String(i + 1).padStart(3, '0')}</span><br><b style="color:${PAL[a]}">${a}</b> <span class="k">—</span> <b style="color:${PAL[b]}">${b}</b><br>${NAME[a]} · ${NAME[b]}<br><span class="k">${hb} hydrogen bonds · ${'AG'.includes(a) ? 'purine' : 'pyrimidine'} + ${'AG'.includes(b) ? 'purine' : 'pyrimidine'}</span>${inGene ? '<br><span style="color:#19e6c1">▸ inside gene HBB · exon 1</span>' : ''}`;
+  tip.style.left = Math.min(mouse.x, innerWidth - 230) + 'px'; tip.style.top = Math.min(mouse.y, innerHeight - 120) + 'px';
+  tip.classList.add('on');
+}
+
+/* ================= DOM per-frame ================= */
+const progress = document.getElementById('progress'), roChap = document.getElementById('roChap'), roBp = document.getElementById('roBp');
+const tk1 = document.getElementById('tk1'), tk2 = document.getElementById('tk2'), flash = document.getElementById('flash');
+let lastBp = -1, lastCh = -1;
+const cardR = cards.map((c, i) => i === 0 ? 1 : 0);
+const cardKids = cards.map(c => c ? [...c.children] : []);
+function updateDOM(f, dt = 0.016) {
+  const n = sections.length;
+  cards.forEach((c, i) => {
+    if (!c || i === n - 1) return;
+    const d = f - i;
+    // target reveal: fully in near the chapter centre, gone well before the next one
+    const target = i === 0 ? 1 - sm(0.12, 0.42, d) : 1 - sm(0.1, 0.4, Math.abs(d));
+    // ease toward it slowly so text drifts in instead of popping
+    const rate = target > cardR[i] ? 1.6 : 3.2;
+    cardR[i] += (target - cardR[i]) * (SNAP ? 1 : 1 - Math.exp(-dt * rate));
+    const R = cardR[i];
+    c.style.opacity = sm(0, 0.35, R).toFixed(3);
+    c.style.transform = `translateY(${(-d * 70).toFixed(1)}px)`;
+    c.style.visibility = R < 0.01 ? 'hidden' : 'visible';
+    // stagger each line of the card: number, title, text, facts…
+    cardKids[i].forEach((k, j) => {
+      const a = sm(0.08 + j * 0.13, 0.5 + j * 0.13, R);
+      k.style.opacity = a.toFixed(3);
+      k.style.transform = `translateY(${((1 - a) * 26).toFixed(1)}px)`;
+      k.style.filter = a < 0.98 ? `blur(${((1 - a) * 6).toFixed(1)}px)` : 'none';
+    });
+  });
+  const ch = clamp(Math.round(f), 0, n - 1);
+  if (ch !== lastCh) { lastCh = ch; railBtns.forEach((b, i) => b.classList.toggle('on', i === ch)); roChap.textContent = `${String(ch).padStart(2, '0')} · ${CH_NAMES[ch].toUpperCase()}`; }
+  const max = document.documentElement.scrollHeight - innerHeight;
+  progress.style.width = (max > 0 ? scrollY / max * 100 : 0).toFixed(2) + '%';
+  const bp = clamp(Math.floor(f / 10.5 * NBP), 0, NBP - 1);
+  if (bp !== lastBp) {
+    lastBp = bp; roBp.textContent = `BP ${String(bp + 1).padStart(4, '0')} / ${NBP}`;
+    let s1 = '', s2 = '';
+    for (let k = -10; k <= 10; k++) { const i = bp + k; if (i < 0 || i >= NBP) { s1 += '·'; s2 += '·'; continue; } const a = SEQ[i], b = COMP[a], cur = k === 0;
+      s1 += `<span style="color:${PAL[a]};opacity:${cur ? 1 : .35 + .5 * (1 - Math.abs(k) / 10)}${cur ? ';text-shadow:0 0 8px ' + PAL[a] : ''}">${a}</span>`;
+      s2 += `<span style="color:${PAL[b]};opacity:${cur ? 1 : .25 + .4 * (1 - Math.abs(k) / 10)}">${b}</span>`; }
+    tk1.innerHTML = s1; tk2.innerHTML = s2;
+  }
+  flash.style.opacity = (Math.exp(-Math.pow((f - 11.5) / 0.13, 2)) * 0.55).toFixed(3);
+  document.body.classList.toggle('in-ex', f > 11.4);
+}
+
+/* ================= render loop ================= */
+let fs = 0, T = 0, spinA = 0, last = performance.now(), firstFrame = true;
+const camPos = new V3(), lookAt = new V3(), par = { x: 0, y: 0 };
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now; T += dt;
+  const f = computeF();
+  fs += (f - fs) * (1 - Math.exp(-dt * (REDUCED ? 12 : 2.6)));
+  if (Math.abs(f - fs) < 1e-4 || SNAP) fs = f;
+  updateDOM(fs, dt);
+  if (ok3d) {
+    const k = sampleKF(fs);
+    U.uTime.value = T;
+    U.uUnzip.value = k.unzip;
+    U.uFork.value = lerp(36, 4, clamp(fs - 6.5, 0, 1));
+    U.uFocus.value = k.focus; U.uFocusY.value = k.fy; U.uGene.value = k.gene;
+    const fv = U.uFilter.value; fv.x += (filterTarget[0] - fv.x) * .1; fv.y += (filterTarget[1] - fv.y) * .1; fv.z += (filterTarget[2] - fv.z) * .1; fv.w += (filterTarget[3] - fv.w) * .1;
+    mats.bb[0].uniforms.uI.value = k.bb; mats.bb[1].uniforms.uI.value = k.bb; mats.phos.uniforms.uI.value = k.bb * 0.9;
+    mats.rods.uniforms.uI.value = k.rods; mats.lines.uniforms.uI.value = k.lines; mats.hb.uniforms.uI.value = k.hb;
+    mats.atoms.uniforms.uI.value = k.atoms; mats.cloud.uniforms.uI.value = k.cloud * 0.8; mats.scan.uniforms.uI.value = k.scan;
+    helix.visible = (k.bb + k.rods + k.lines + k.cloud) > 0.02;
+    mats.nucDNA.uniforms.uI.value = k.nuc * 0.85; mats.hist.uniforms.uI.value = k.nuc * 0.32; mats.tails.uniforms.uI.value = k.nuc * 0.5; mats.nucPts.uniforms.uI.value = k.nuc * 0.4;
+    chromatin.visible = k.nuc > 0.01; chromatin.rotation.y = T * 0.12; chromatin.scale.setScalar(0.85 + 0.15 * k.nuc);
+    mats.chr.uniforms.uI.value = k.chr; chromo.visible = k.chr > 0.01; chromo.rotation.y = T * 0.18; chromo.scale.setScalar(0.7 + 0.3 * k.chr);
+    mats.dust.uniforms.uI.value = 0.55; dust.rotation.y = T * 0.01;
+    scanner.position.y = k.focus > 0.5 ? k.fy : Y0 + ((T * 5) % (NBP * RISE));
+    spinA += k.spin * dt * (REDUCED ? 0.3 : 1);
+    helix.rotation.y = spinA; helix.rotation.z = k.tilt;
+    par.x += (mouse.nx - par.x) * 0.04; par.y += (mouse.ny - par.y) * 0.04;
+    const dist = Math.hypot(k.cam[0] - k.look[0], k.cam[1] - k.look[1], k.cam[2] - k.look[2]);
+    const pm = clamp(dist / 25, 0.05, 1.3) * (1 - k.warp);
+    camPos.set(k.cam[0] + par.x * pm * 1.2, k.cam[1] + par.y * pm * 0.8, k.cam[2]);
+    camera.position.copy(camPos); lookAt.set(k.look[0], k.look[1], k.look[2]); camera.lookAt(lookAt);
+    // warp streaks
+    const wv = k.warp, pos = warp.geometry.attributes.position.array;
+    warp.material.opacity = wv * 0.9; warp.visible = wv > 0.01;
+    if (warp.visible) { warp.userData.forEach((d, i) => { d.z += d.v * dt * (0.3 + wv); if (d.z > -0.3) d.z -= 80; const len = 0.4 + wv * 6; pos.set([d.x, d.y, d.z, d.x, d.y, d.z - len], i * 6); }); warp.geometry.attributes.position.needsUpdate = true; }
+    if (bloom) bloom.strength = 0.95 - k.warp * 0.25;
+    if (finalPass) { finalPass.uniforms.uTime.value = T; finalPass.uniforms.uAmt.value = 0.012 + k.warp * 0.03; }
+    doHover(k);
+    if (composer) composer.render(); else renderer.render(scene, camera);
+  }
+  drawExplorer(dt);
+  if (firstFrame) { firstFrame = false; loaded(); }
+  requestAnimationFrame(frame);
+}
+function resize() {
+  measure();
+  if (!ok3d) return;
+  const pr = Math.min(devicePixelRatio || 1, innerWidth < 800 ? 1.5 : 1.75);
+  renderer.setPixelRatio(pr); renderer.setSize(innerWidth, innerHeight, false);
+  U.uPx.value = pr;
+  camera.aspect = innerWidth / innerHeight; camera.fov = innerWidth < innerHeight ? 60 : 45; camera.updateProjectionMatrix();
+  if (composer) { composer.setPixelRatio(pr); composer.setSize(innerWidth, innerHeight); }
+}
+
+/* =====================================================================
+   GENE EXPLORER (2D canvas animations)
+   ===================================================================== */
+const MONO = '"JetBrains Mono", ui-monospace, monospace';
+const _hc = {};
+function hexA(h, a) { let c = _hc[h]; if (!c) { const n = parseInt(h.slice(1), 16); c = _hc[h] = [(n >> 16) & 255, (n >> 8) & 255, n & 255]; } return `rgba(${c[0]},${c[1]},${c[2]},${clamp(a, 0, 1).toFixed(3)})`; }
+function line(c, x0, y0, x1, y1) { c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1); c.stroke(); }
+function txt(c, s, x, y, o = {}) { c.save(); c.font = `${o.w || 500} ${o.s || 11}px ${o.f || MONO}`; c.textAlign = o.a || 'center'; c.textBaseline = 'middle'; c.fillStyle = o.c || PAL.ink; c.globalAlpha *= (o.al ?? 1); c.fillText(s, x, y); c.restore(); }
+function bez(a, b, c2, d, n) { const o = []; for (let i = 0; i <= n; i++) { const t = i / n, m = 1 - t; o.push([m * m * m * a[0] + 3 * m * m * t * b[0] + 3 * m * t * t * c2[0] + t * t * t * d[0], m * m * m * a[1] + 3 * m * m * t * b[1] + 3 * m * t * t * c2[1] + t * t * t * d[1]]); } return o; }
+function samplePoly(pts0, step) {
+  const pts = [pts0[0]]; for (let i = 1; i < pts0.length; i++) { const p = pts[pts.length - 1]; if (Math.hypot(pts0[i][0] - p[0], pts0[i][1] - p[1]) > 0.5) pts.push(pts0[i]); }
+  const cum = [0]; for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+  const total = cum[cum.length - 1], out = []; let j = 0;
+  for (let s = 0; s <= total; s += step) {
+    while (j < pts.length - 2 && cum[j + 1] < s) j++;
+    const L = cum[j + 1] - cum[j] || 1, u = (s - cum[j]) / L, dx = pts[j + 1][0] - pts[j][0], dy = pts[j + 1][1] - pts[j][1];
+    out.push({ x: pts[j][0] + dx * u, y: pts[j][1] + dy * u, nx: -dy / L, ny: dx / L, s });
+  }
+  return out;
+}
+function nearestX(S, x) { let b = S[0], d = 1e9; for (const p of S) { const e = Math.abs(p.x - x); if (e < d) { d = e; b = p; } } return b; }
+const DSEQ = 'ATGCGTACCGATTAGCCATGGCTAAGTCCGATGCAATCGGTAC';
+function dnaAlong(c, S, t, o = {}) {
+  const amp = o.amp ?? 10, per = o.per ?? 40, spd = o.speed ?? 1.4, al = o.alpha ?? 1;
+  c.save(); c.globalCompositeOperation = 'lighter'; c.lineCap = 'round';
+  for (let i = 0; i < S.length; i += 3) {
+    const p = S[i], sn = Math.sin(p.s / per * TAU + t * spd);
+    const ax = p.x + p.nx * amp * sn, ay = p.y + p.ny * amp * sn, bx = p.x - p.nx * amp * sn, by = p.y - p.ny * amp * sn, mx = (ax + bx) / 2, my = (ay + by) / 2;
+    const b = DSEQ[(i / 3 | 0) % DSEQ.length];
+    c.globalAlpha = (0.2 + 0.6 * Math.abs(sn)) * al;
+    c.lineWidth = 2; c.strokeStyle = PAL[b]; line(c, ax, ay, mx, my); c.strokeStyle = PAL[COMP[b]]; line(c, mx, my, bx, by);
+  }
+  for (const sg of [1, -1]) for (let i = 0; i < S.length - 1; i++) {
+    const p = S[i], q = S[i + 1], ph = p.s / per * TAU + t * spd, ph2 = q.s / per * TAU + t * spd;
+    const depth = 0.5 + 0.5 * Math.cos(ph) * sg;
+    const x0 = p.x + p.nx * amp * sg * Math.sin(ph), y0 = p.y + p.ny * amp * sg * Math.sin(ph), x1 = q.x + q.nx * amp * sg * Math.sin(ph2), y1 = q.y + q.ny * amp * sg * Math.sin(ph2);
+    c.strokeStyle = sg > 0 ? PAL.teal : PAL.blue;
+    c.globalAlpha = (0.08 + 0.1 * depth) * al; c.lineWidth = 6; line(c, x0, y0, x1, y1);
+    c.globalAlpha = (0.3 + 0.7 * depth) * al; c.lineWidth = 1 + 1.6 * depth; line(c, x0, y0, x1, y1);
+  }
+  c.restore();
+}
+function band(c, S, pred, col, width, a) { c.save(); c.globalCompositeOperation = 'lighter'; c.strokeStyle = hexA(col, a); c.lineWidth = width; c.lineCap = 'round'; c.lineJoin = 'round'; c.beginPath(); let on = false; for (const p of S) { if (pred(p)) { if (!on) { c.moveTo(p.x, p.y); on = true; } else c.lineTo(p.x, p.y); } else on = false; } c.stroke(); c.restore(); }
+function blob(c, x, y, r, col, t, seed = 0, a = 1, label) {
+  if (a <= 0.01 || r <= 0.5) return;
+  c.save(); c.globalCompositeOperation = 'lighter';
+  const g = c.createRadialGradient(x, y, r * 0.1, x, y, r * 1.5); g.addColorStop(0, hexA(col, 0.3 * a)); g.addColorStop(1, hexA(col, 0));
+  c.fillStyle = g; c.beginPath(); c.arc(x, y, r * 1.5, 0, TAU); c.fill();
+  for (const [k, al] of [[1, 0.9], [0.68, 0.35]]) {
+    c.beginPath();
+    for (let i = 0; i <= 40; i++) { const an = i / 40 * TAU, rr = r * k * (1 + 0.07 * Math.sin(3 * an + t * 1.3 + seed) + 0.05 * Math.sin(5 * an - t * 0.9 + seed * 2)); const px = x + Math.cos(an) * rr, py = y + Math.sin(an) * rr; i ? c.lineTo(px, py) : c.moveTo(px, py); }
+    c.closePath(); if (k === 1) { c.fillStyle = hexA(col, 0.12 * a); c.fill(); }
+    c.strokeStyle = hexA(col, al * a); c.lineWidth = k === 1 ? 1.5 : 1; if (k !== 1) c.setLineDash([3, 4]); c.stroke(); c.setLineDash([]);
+  }
+  c.restore();
+  if (label) txt(c, label, x, y, { s: Math.max(8, Math.min(11, r * 0.55)), w: 600, al: a, c: '#eafffb' });
+}
+function focusRing(c, x, y, r, col, t) {
+  c.save(); c.globalCompositeOperation = 'lighter'; const p = 0.5 + 0.5 * Math.sin(t * 5);
+  const g = c.createRadialGradient(x, y, 0, x, y, r * 1.7); g.addColorStop(0, hexA(col, 0.22)); g.addColorStop(1, hexA(col, 0)); c.fillStyle = g; c.beginPath(); c.arc(x, y, r * 1.7, 0, TAU); c.fill();
+  c.strokeStyle = hexA(col, 0.55 + 0.4 * p); c.lineWidth = 1.5; c.setLineDash([4, 4]); c.lineDashOffset = -t * 20; c.beginPath(); c.arc(x, y, r + 3 * p, 0, TAU); c.stroke(); c.restore();
+}
+function rrect(c, x, y, w, h, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
+function pentagon(c, x, y, r, rot) { c.beginPath(); for (let k = 0; k < 5; k++) { const a = rot + k / 5 * TAU; k ? c.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r) : c.moveTo(x + Math.cos(a) * r, y + Math.sin(a) * r); } c.closePath(); }
+const AACOL = ch => 'AVLIMFWPG'.includes(ch) ? PAL.teal : 'STNQYC'.includes(ch) ? PAL.blue : 'KRH'.includes(ch) ? PAL.G : 'DE'.includes(ch) ? PAL.C : PAL.ink;
+const AANAME = { M: 'Met', V: 'Val', H: 'His', L: 'Leu', T: 'Thr', P: 'Pro', E: 'Glu', K: 'Lys', S: 'Ser', A: 'Ala', W: 'Trp', G: 'Gly', N: 'Asn', D: 'Asp', R: 'Arg', Y: 'Tyr' };
+function bead(c, x, y, ch, col, r = 7, a = 1) { c.save(); c.globalCompositeOperation = 'lighter'; c.fillStyle = hexA(col, 0.22 * a); c.strokeStyle = hexA(col, 0.9 * a); c.lineWidth = 1.3; c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill(); c.stroke(); c.restore(); if (ch && r >= 6) txt(c, ch, x, y + 0.5, { s: r * 1.15, w: 700, al: a, c: '#eafffb' }); }
+
+const UTR5 = 'ACAUUUGCUUCUGACACAACUGUGUUCACUAGCAACCUCAAACAGACACC';
+const EX1 = 'AUG GUG CAC CUG ACU CCU GAG GAG AAG UCU GCC GUU ACU GCC CUG UGG GGC AAG GUG AAC GUG GAU GAA GUU GGU GGU GAG GCC CUG GGC AGG'.split(' ');
+const EX1AA = 'MVHLTPEEKSAVTALWGKVNVDEVGGEALGR';
+const EX3 = 'GUG GCU GGU GUG GCU AAU GCC CUG GCC CAC AAG UAU CAC UAA'.split(' ');
+const EX3AA = 'VAGVANALAHKYH';
+const INTRON2 = (() => { const r = rng(42); let s = 'GTGAGT'; while (s.length < 830) { const x = r(); s += x < .31 ? 'T' : x < .6 ? 'A' : x < .8 ? 'G' : 'C'; } s += 'TTTCTTTTCCCTTCTTTCAG'; return s; })();
+
+const CARDS = [
+  { id: 'lcr', map: 'LCR', kind: 'reg', f: 1.1, col: PAL.C, tag: 'REGULATORY · UPSTREAM', co: '~6–22 kb upstream', title: 'Enhancer: the Locus Control Region',
+    desc: 'Genes need a volume knob. Far upstream of HBB sits the Locus Control Region, a cluster of enhancers. Activator proteins grab it, and the DNA loops back on itself so the enhancer can physically touch the promoter and switch the gene on, but only in developing red blood cells.',
+    hs: [{ id: 'loop', label: 'DNA loop', text: 'Enhancers can work from thousands of base pairs away. The DNA folds into a loop that brings the enhancer right up against the promoter, and protein bridges (for β-globin, a factor called LDB1) hold it there.' },
+         { id: 'act', label: 'Activators', text: 'Transcription factors like GATA1 and KLF1 recognise short DNA "words" in the enhancer. They are made only in red-cell precursors, which is why your skin cells never make hemoglobin.' },
+         { id: 'med', label: 'Mediator', text: 'Mediator is a huge complex of about 30 proteins that bridges the activators and the polymerase, passing on the "go" signal.' }],
+    draw(c, w, h, t, st) {
+      const cyc = (t % 10) / 10, L = sm(.12, .4, cyc) * (1 - sm(.8, .97, cyc));
+      const by = h * .74, Ex = lerp(w * .2, w * .46, L), Px = w * .66, H = h * (.24 + .36 * L);
+      const loop = bez([Ex, by], [Ex - w * .05 - w * .1 * L, by - H], [Px + w * .06, by - H], [Px, by], 70);
+      const S = samplePoly([[w * .02, by], ...loop, [w * .98, by]], 3);
+      const sE = Ex - w * .02, sP = S.find(p => p.s > sE + 20 && Math.abs(p.x - Px) < 3 && Math.abs(p.y - by) < 3)?.s ?? sE + 300;
+      if (st.focus === 'loop') band(c, S, p => p.s > sE && p.s < sP, PAL.C, 30, .14);
+      band(c, S, p => p.s > sE - 26 && p.s < sE + 6, PAL.G, 24, .16);
+      band(c, S, p => p.s > sP - 4 && p.s < sP + 34, PAL.T, 24, .16);
+      dnaAlong(c, S, t, { amp: 8, per: 36 });
+      const fa = st.focus === 'act' ? 1.35 : 1;
+      blob(c, Ex - 16, by - 22, 13, PAL.A, t, 1, fa, 'GATA1'); blob(c, Ex + 13, by - 27, 12, PAL.G, t, 2, fa, 'KLF1');
+      blob(c, lerp(Ex, Px, .5), by - 36 - 6 * L, 8 + 18 * L, PAL.C, t, 3, L * (st.focus === 'med' ? 1.35 : 1), L > .6 ? 'Mediator' : '');
+      blob(c, Px + 18, by - 22, 19, PAL.T, t, 4, 1, 'Pol II');
+      txt(c, 'LCR / ENHANCER', Ex - 8, by + 30, { s: 10, c: PAL.G, w: 600 }); txt(c, 'PROMOTER', Px + 14, by + 30, { s: 10, c: PAL.T, w: 600 }); txt(c, 'HBB →', Px + 86, by + 30, { s: 10, c: PAL.teal, w: 600 });
+      if (st.focus === 'act') focusRing(c, Ex - 2, by - 25, 28, PAL.A, t);
+      if (st.focus === 'med' && L > .3) focusRing(c, lerp(Ex, Px, .5), by - 42, 26, PAL.C, t);
+      if (st.focus === 'loop') txt(c, 'DNA LOOP', lerp(Ex, Px, .5), by - H * .8 - 6, { s: 10, c: PAL.C, w: 600 });
+      txt(c, L > .6 ? 'ENHANCER ⇄ PROMOTER: CONTACT' : 'LOOPING…', w * .04, 18, { a: 'left', s: 10, c: L > .6 ? PAL.A : PAL.ink, al: .7 });
+    } },
+  { id: 'prom', map: 'Promoter', kind: 'reg', f: 1, col: PAL.T, tag: 'REGULATORY · CORE', co: '−110 → +1', title: 'Promoter: the landing pad',
+    desc: 'The promoter is where the reading machinery lands. Short boxes of sequence tell proteins exactly where to sit. TATA-binding protein grabs the TATA box and bends the DNA, then RNA polymerase II docks and starts copying at position +1.',
+    hs: [{ id: 'cacc', label: 'CACCC box', text: 'At about −90. KLF1 binds here. Single-letter mutations in this box weaken the promoter and cause a mild form of β-thalassemia.' },
+         { id: 'ccaat', label: 'CCAAT box', text: 'At about −75. A classic promoter element recognised by the NF-Y protein. It helps set how strongly the gene fires.' },
+         { id: 'tata', label: 'TATA box', text: 'HBB’s version reads CATAAAA at about −30. TATA-binding protein sits in the minor groove and kinks the DNA by roughly 80°, marking the start line.' },
+         { id: 'pol', label: 'RNA polymerase II', text: 'The enzyme that reads DNA and writes RNA. It starts at +1 and moves along at roughly 20–70 bases per second.' }],
+    draw(c, w, h, t, st) {
+      const cyc = (t % 9) / 9, by = h * .62, x0 = w * .04, x1 = w * .96, X = b => x0 + (b + 110) / 150 * (x1 - x0), xt = X(-28);
+      const bend = sm(.18, .3, cyc) * (1 - sm(.9, 1, cyc)), fade = 1 - sm(.93, 1, cyc);
+      const pts = []; for (let x = x0; x <= x1; x += 5) pts.push([x, by + bend * .11 * Math.min(Math.abs(x - xt), 170)]);
+      const S = samplePoly(pts, 3);
+      const boxes = [['cacc', 'CACCC', -90, -86, PAL.G, '−90'], ['ccaat', 'CCAAT', -76, -72, PAL.C, '−75'], ['tata', 'CATAAAA', -31, -25, PAL.A, '−30']];
+      boxes.forEach(([id, lab, a, b, col]) => { const f = st.focus === id; band(c, S, p => p.x >= X(a) - 2 && p.x <= X(b + 1) + 2, col, f ? 32 : 24, f ? .32 : .14); });
+      dnaAlong(c, S, t, { amp: 9, per: 34 });
+      boxes.forEach(([id, lab, a, b, col, pos]) => { const p = nearestX(S, (X(a) + X(b + 1)) / 2); txt(c, lab, p.x, p.y + 30, { s: 10, c: col, w: 700 }); txt(c, pos, p.x, p.y + 44, { s: 9, al: .55 }); if (st.focus === id) focusRing(c, p.x, p.y, 22, col, t); });
+      const p1 = nearestX(S, X(0)); c.save(); c.strokeStyle = PAL.ink; c.globalAlpha = .8; c.lineWidth = 1.5; c.beginPath(); c.moveTo(p1.x, p1.y + 16); c.lineTo(p1.x, p1.y + 34); c.lineTo(p1.x + 22, p1.y + 34); c.stroke(); c.beginPath(); c.moveTo(p1.x + 22, p1.y + 30); c.lineTo(p1.x + 28, p1.y + 34); c.lineTo(p1.x + 22, p1.y + 38); c.fill(); c.restore();
+      txt(c, '+1', p1.x - 10, p1.y + 34, { s: 10, w: 700 });
+      const tp = nearestX(S, xt), ty = lerp(-30, tp.y - 21, sm(.04, .2, cyc));
+      blob(c, xt, ty, 15, PAL.A, t, 1, fade * (st.focus === 'tata' ? 1.3 : 1), 'TBP');
+      const pk = sm(.34, .55, cyc), px = lerp(w * 1.1, X(6), pk), py = lerp(-40, by - 36, pk);
+      blob(c, px, py, 26, PAL.T, t, 4, fade * (st.focus === 'pol' ? 1.3 : 1), 'Pol II');
+      if (st.focus === 'pol' && pk > .5) focusRing(c, px, py, 30, PAL.T, t);
+      const rk = sm(.58, .9, cyc); if (rk > 0) { const Rn = 'ACAUUUGCUUCUGACACAAC', n = Math.floor(rk * Rn.length); for (let i = 0; i < n; i++) txt(c, Rn[i], px + 30 + i * 9, py - 8 - i * 3 + Math.sin(i * .7 + t * 2) * 3, { c: PAL[Rn[i]], s: 10, w: 700, al: fade }); if (n > 4) txt(c, 'RNA 5′→', px + 40, py - 34, { s: 9, al: fade * .7, c: PAL.teal }); }
+      txt(c, ['TBP LANDS ON TATA', 'DNA BENDS ~80°', 'POL II DOCKS', 'TRANSCRIPTION BEGINS'][cyc < .18 ? 0 : cyc < .34 ? 1 : cyc < .58 ? 2 : 3], w * .04, 18, { a: 'left', s: 10, al: .7 });
+    } },
+  { id: 'utr5', map: '5′UTR', kind: 'utr', f: .7, col: PAL.teal, tag: 'mRNA · UNTRANSLATED', co: '+1 → +50', title: '5′ UTR: the runway',
+    desc: 'The first 50 letters of the message are copied but never turned into protein. A protective cap is added to the front. The ribosome lands on the cap, then slides along this runway until it finds the start codon.',
+    hs: [{ id: 'cap', label: '5′ cap', text: 'A modified guanine (m⁷G) attached backwards with an unusual 5′-to-5′ link. It protects the RNA from being chewed up, and it is the handle the ribosome grabs.' },
+         { id: 'scan', label: 'Scanning', text: 'The small ribosomal subunit (40S) glides 5′→3′, checking each triplet until it meets AUG in a good context. Then the large subunit (60S) joins.' },
+         { id: 'kozak', label: 'Kozak sequence', text: 'HBB’s start sits in ACACCAUGG: an A three letters before AUG and a G right after. That is a strong Kozak context, so ribosomes rarely miss it.' }],
+    draw(c, w, h, t, st) {
+      const seq = UTR5 + 'AUGGUGCACCUG', n = seq.length, cyc = (t % 8) / 8, y = h * .6, dx = clamp(w / 34, 12, 16), V = (w * .9) / dx;
+      const ri = lerp(-2.2, 51, sm(.06, .58, cyc)), off = clamp(ri - V * .5, -3, n - V + 1);
+      const LX = i => w * .05 + dx * (i - off + .5), LY = i => y + Math.sin(i * .45 + t * 1.5) * 3;
+      const rib = LX(ri), capX = LX(-2.2);
+      if (st.focus === 'kozak') { c.save(); c.fillStyle = hexA(PAL.G, .12); c.strokeStyle = hexA(PAL.G, .7); rrect(c, LX(44) - dx / 2, y - 16, dx * 10, 32, 6); c.fill(); c.stroke(); c.restore(); txt(c, 'KOZAK  gccA cc AUG G', LX(48.5), y - 28, { s: 9, c: PAL.G, w: 600 }); }
+      c.save(); c.strokeStyle = hexA(PAL.teal, .5); c.lineWidth = 1.4; c.beginPath(); c.moveTo(capX, y + 10); for (let i = 0; i < n; i++) c.lineTo(LX(i), LY(i) + 10); c.stroke(); c.restore();
+      const fsz = clamp(dx * .95, 10, 14);
+      for (let i = 0; i < n; i++) { const x = LX(i); if (x < -10 || x > w + 10) continue; const aug = i >= 50 && i <= 52, lit = x < rib + 10 || (aug && cyc > .58); txt(c, seq[i], x, LY(i), { c: aug ? '#ffffff' : PAL[seq[i]], s: fsz, w: 700, al: lit ? 1 : .35 }); if (i % 10 === 0) txt(c, '+' + (i + 1), x, y + 26, { s: 8, al: .4 }); }
+      if (cyc > .58 || st.focus === 'aug') { c.save(); c.globalCompositeOperation = 'lighter'; c.strokeStyle = hexA(PAL.A, .9); c.lineWidth = 1.5; rrect(c, LX(50) - dx / 2 - 2, y - 11, dx * 3 + 4, 22, 5); c.stroke(); c.restore(); txt(c, 'START · AUG', LX(51), y + 44, { s: 10, c: PAL.A, w: 700 }); }
+      if (capX > -30) { c.save(); c.globalCompositeOperation = 'lighter'; c.strokeStyle = PAL.fe; c.fillStyle = hexA(PAL.fe, .15); c.lineWidth = 1.5; c.beginPath(); for (let k = 0; k < 6; k++) { const a = k / 6 * TAU; c.lineTo(capX + Math.cos(a) * 13, y + Math.sin(a) * 13); } c.closePath(); c.fill(); c.stroke(); c.restore();
+        txt(c, 'm⁷G', capX, y, { s: 8, w: 700, c: PAL.fe }); txt(c, '5′ CAP', capX, y + 40, { s: 9, c: PAL.fe, w: 600 });
+        if (st.focus === 'cap') focusRing(c, capX, y, 18, PAL.fe, t); }
+      else if (st.focus === 'cap') txt(c, '← cap is behind the ribosome', w * .05, y + 56, { a: 'left', s: 9, c: PAL.fe });
+      c.save(); c.globalCompositeOperation = 'lighter'; c.fillStyle = hexA(PAL.teal, .18); c.strokeStyle = hexA(PAL.teal, .9); c.lineWidth = 1.4; c.beginPath(); c.ellipse(rib, y + 18, 30, 13, 0, 0, TAU); c.fill(); c.stroke(); c.restore();
+      txt(c, '40S', rib, y + 18, { s: 9, w: 700 });
+      const lk = sm(.6, .72, cyc); if (lk > 0) { const ly = lerp(y - 120, y - 22, lk); c.save(); c.globalCompositeOperation = 'lighter'; c.globalAlpha = lk; c.fillStyle = hexA(PAL.blue, .2); c.strokeStyle = hexA(PAL.blue, .9); c.lineWidth = 1.4; c.beginPath(); c.ellipse(LX(51), ly, 38, 20, 0, 0, TAU); c.fill(); c.stroke(); c.restore(); txt(c, '60S', LX(51), ly, { s: 9, w: 700, al: lk }); }
+      if (cyc < .58) txt(c, 'scanning →', rib, y + 44, { s: 9, al: .7, c: PAL.teal });
+      if (st.focus === 'scan') focusRing(c, rib, y + 12, 34, PAL.teal, t);
+      txt(c, "5′ ——— 3′  ·  mRNA", w * .04, 18, { a: 'left', s: 10, al: .6 });
+    } },
+  { id: 'ex1', map: 'Exon 1', kind: 'exon', f: 1, col: PAL.A, tag: 'CODING · EXON 1', co: 'codons 1–30', title: 'Exon 1: the first words',
+    desc: 'Exons are the parts that make it into the final message. Every three letters (a codon) stands for one amino acid. Watch the ribosome read exon 1: Met-Val-His-Leu-Thr-Pro-Glu-Glu…',
+    toggle: 'Mutate codon 6',
+    hs: [{ id: 'start', label: 'Start codon', text: 'AUG codes for methionine and sets the reading frame. In β-globin this first Met is trimmed off afterwards, so numbering starts at Val-1.' },
+         { id: 'c6', label: 'Codon 6', text: 'GAG means glutamic acid (Glu). A single DNA letter change here (A→T, so GAG becomes GUG) swaps in valine and causes sickle cell disease. Tap “Mutate codon 6” to see it.' },
+         { id: 'frame', label: 'Reading frame', text: 'Letters are read in non-overlapping triplets. Insert or delete one letter and every codon after it changes. That is called a frameshift, and it usually wrecks the protein.' }],
+    mutText: 'Sickle mutation: GAG → GUG, Glu → Val. Valine is oily, so when oxygen is low the hemoglobins stick together into long fibres that bend red cells into sickles. Carrying one copy also gives some protection against severe malaria.',
+    draw(c, w, h, t, st, dt) {
+      const cw = clamp(w / 11, 38, 58), y = h * .76, rx = w * .5, N = EX1.length, total = w * .3 + N * cw + w * .3;
+      if (st.o == null) st.o = w * .3;
+      if (st.focus === 'start' || st.focus === 'c6') { const k = st.focus === 'start' ? 0 : 6; st.o += (w * .3 + k * cw - st.o) * (1 - Math.exp(-dt * 3)); }
+      else { st.o += cw * 0.6 * dt; if (st.o > total) st.o = 0; }
+      const o = st.o, cur = Math.round((o - w * .3) / cw);
+      for (let k = 0; k < N; k++) {
+        const cx = rx + w * .3 + k * cw - o; if (cx < -cw || cx > w + cw) continue;
+        const cod = (k === 6 && st.mut) ? 'GUG' : EX1[k], hot = (k === 6 && (st.mut || st.focus === 'c6')) ? PAL.warn : k === 0 ? PAL.A : PAL.teal;
+        c.save(); c.globalCompositeOperation = 'lighter'; c.strokeStyle = hexA(hot, k === cur ? .95 : .35); c.fillStyle = hexA(hot, k === cur ? .14 : .04); c.lineWidth = 1.2; rrect(c, cx - cw / 2 + 2, y - 13, cw - 4, 26, 5); c.fill(); c.stroke(); c.restore();
+        for (let j = 0; j < 3; j++) txt(c, cod[j], cx + (j - 1) * cw * .24, y, { c: (k === 6 && st.mut && j === 1) ? PAL.warn : PAL[cod[j]], s: clamp(cw * .26, 9, 13), w: 700 });
+        if (st.focus === 'frame') txt(c, k % 2 ? '▔▔▔' : '▁▁▁', cx, y + 20, { s: 9, c: k % 2 ? PAL.teal : PAL.cyan, al: .8 });
+        txt(c, String(k), cx, y + 30, { s: 8, al: .4 });
+      }
+      const nP = clamp(Math.floor((o - w * .3) / cw + 0.1) + 1, 0, N);
+      const path = samplePoly([[rx - 10, y - 40], [w * .12, y - 66], [w * .07, h * .26], [w * .3, h * .1], [w * .95, h * .1]], 15);
+      for (let a = 0; a < nP; a++) { const k = nP - 1 - a, p = path[Math.min(a, path.length - 1)]; if (!p) break; const aa = (k === 6 && st.mut) ? 'V' : EX1AA[k]; const col = (k === 6 && st.mut) ? PAL.warn : AACOL(aa); bead(c, p.x + p.nx * Math.sin(a * .8 + t * 2) * 4, p.y + p.ny * Math.sin(a * .8 + t * 2) * 4, aa, col, 7.5); }
+      blob(c, rx, y - 18, 28, PAL.blue, t, 2, .9); blob(c, rx, y + 16, 20, PAL.teal, t, 5, .9);
+      txt(c, 'RIBOSOME', rx, y - 52, { s: 9, al: .6 });
+      if (cur >= 0 && cur < N) { const aa = (cur === 6 && st.mut) ? 'V' : EX1AA[cur], cod = (cur === 6 && st.mut) ? 'GUG' : EX1[cur]; txt(c, `CODON ${cur} · ${cod} → ${AANAME[aa]}${cur === 0 ? ' (start)' : ''}`, w * .96, 18, { a: 'right', s: 10, w: 600, c: (cur === 6 && st.mut) ? PAL.warn : PAL.ink }); }
+      if (st.mut) txt(c, '⚠ SICKLE MUTATION ACTIVE', w * .04, 18, { a: 'left', s: 10, w: 700, c: PAL.warn });
+    } },
+  { id: 'in1', map: 'Intron 1', kind: 'intron', f: 1.1, col: PAL.C, tag: 'NON-CODING · INTRON 1', co: '130 bp', title: 'Intron 1: cut it out',
+    desc: 'Introns are copied into RNA and then spliced out. The spliceosome recognises the intron’s edges, folds it into a lasso-shaped lariat, snips it free and stitches the exons together.',
+    hs: [{ id: 'gu', label: 'GU donor', text: 'Almost every intron starts with GU (GT in the DNA). It marks the 5′ splice site, where the U1 snRNP binds.' },
+         { id: 'branch', label: 'Branch point A', text: 'An adenine near the end of the intron attacks the 5′ splice site, folding the intron into a loop with a tail: the lariat.' },
+         { id: 'ag', label: 'AG acceptor', text: 'Introns end in AG. A common Mediterranean β-thalassemia mutation in this intron (IVS-I-110 G→A) creates a fake AG upstream, so most of the RNA is spliced wrong.' },
+         { id: 'sp', label: 'Spliceosome', text: 'Five small RNAs (U1, U2, U4, U5, U6) plus well over 100 proteins. The part that actually cuts and joins is made of RNA, not protein.' }],
+    draw(c, w, h, t, st) {
+      const cyc = (t % 11) / 11, y = h * .66, fade = sm(0, .04, cyc) * (1 - sm(.94, 1, cyc));
+      const k1 = sm(.16, .38, cyc), k2 = sm(.46, .62, cyc), k3 = sm(.52, .86, cyc);
+      const e1a = w * .05, e1b = w * .3, e2a = w * .7, e2b = w * .95, bx = w * .6, s1 = k2 * w * .1, s2 = -k2 * w * .3, lift = -k3 * h * .3;
+      c.save(); c.globalAlpha = fade;
+      const sx = lerp(e1b, bx - 6, k1), sy = y - k1 * 8, H = h * .42 * k1 + 4;
+      let pts = k1 < .02 ? [[e1b, y], [e2a, y]] : [...bez([sx, sy], [sx - 70 * k1, y - H], [bx + 70 * k1, y - H], [bx, y], 40), [e2a, y]];
+      pts = pts.map(([x, yy]) => [x, yy + lift]);
+      const S = samplePoly(pts, 6);
+      c.save(); c.globalCompositeOperation = 'lighter'; c.strokeStyle = hexA(PAL.C, .8 * (1 - k3 * .7)); c.lineWidth = 2; c.beginPath(); S.forEach((p, i) => i ? c.lineTo(p.x, p.y) : c.moveTo(p.x, p.y)); c.stroke();
+      S.forEach((p, i) => { c.fillStyle = hexA(PAL[DSEQ[i % DSEQ.length]], .7 * (1 - k3 * .6)); c.beginPath(); c.arc(p.x, p.y, 1.6, 0, TAU); c.fill(); }); c.restore();
+      if (k2 < .02 && k1 < .5) { c.save(); c.strokeStyle = hexA(PAL.C, .6); line(c, e1b, y, e1b, y); c.restore(); }
+      const ex = (x0, x1, lab) => { c.save(); c.globalCompositeOperation = 'lighter'; const g = c.createLinearGradient(x0, 0, x1, 0); g.addColorStop(0, hexA(PAL.A, .35)); g.addColorStop(1, hexA(PAL.teal, .35)); c.fillStyle = g; c.strokeStyle = hexA(PAL.A, .9); c.lineWidth = 1.4; rrect(c, x0, y - 13, x1 - x0, 26, 6); c.fill(); c.stroke(); c.restore(); txt(c, lab, (x0 + x1) / 2, y, { s: 10, w: 700 }); };
+      ex(e1a + s1, e1b + s1, 'EXON 1'); ex(e2a + s2, e2b + s2, 'EXON 2');
+      const gu = [sx + 2, sy + lift - 14], ba = [bx, y + lift + 16], ag = [e2a - 12, y + lift - 14];
+      txt(c, 'GU', gu[0], gu[1], { s: 11, w: 700, c: PAL.G }); txt(c, 'A', ba[0], ba[1], { s: 12, w: 700, c: PAL.fe }); txt(c, 'AG', ag[0], ag[1], { s: 11, w: 700, c: PAL.G });
+      blob(c, e1b + 4, y - 26, 13, PAL.T, t, 1, sm(.02, .1, cyc) * (1 - k1), 'U1');
+      blob(c, bx, y + 30, 13, PAL.blue, t, 2, sm(.06, .14, cyc) * (1 - k2), 'U2');
+      blob(c, lerp(sx, bx, .5), y - H * .55, 34, PAL.C, t, 3, sm(.14, .24, cyc) * (1 - sm(.6, .7, cyc)) * .8 * (st.focus === 'sp' ? 1.4 : 1), 'spliceosome');
+      if (k2 > .9) { focusRing(c, w * .4, y, 16, PAL.A, t); txt(c, 'EXON–EXON JUNCTION', w * .4, y + 34, { s: 9, c: PAL.A, w: 600 }); }
+      if (k3 > .3) txt(c, 'LARIAT (degraded)', bx - 10, y + lift - H - 10, { s: 9, al: 1 - k3, c: PAL.C });
+      if (st.focus === 'gu') focusRing(c, gu[0], gu[1] + 8, 16, PAL.G, t);
+      if (st.focus === 'branch') focusRing(c, ba[0], ba[1] - 8, 16, PAL.fe, t);
+      if (st.focus === 'ag') focusRing(c, ag[0], ag[1] + 8, 16, PAL.G, t);
+      c.restore();
+      txt(c, ['PRE-mRNA', 'LARIAT FORMS', 'EXONS JOIN', 'LARIAT RELEASED'][cyc < .16 ? 0 : cyc < .46 ? 1 : cyc < .62 ? 2 : 3], w * .04, 18, { a: 'left', s: 10, al: .7 });
+    } },
+  { id: 'ex2', map: 'Exon 2', kind: 'exon', f: 1.5, col: PAL.fe, tag: 'CODING · EXON 2', co: 'codons 31–104', title: 'Exon 2: the oxygen pocket',
+    desc: 'The middle exon builds the pocket that holds heme, a flat ring with an iron atom in the centre. That iron is what actually grabs oxygen, and it is what makes blood red.',
+    hs: [{ id: 'heme', label: 'Heme', text: 'A porphyrin ring of four pyrroles holding one Fe²⁺ ion. Each β-globin chain carries one heme.' },
+         { id: 'f8', label: 'His F8 (92)', text: 'The proximal histidine. It bonds directly to the iron from below, anchoring the heme to the protein.' },
+         { id: 'e7', label: 'His E7 (63)', text: 'The distal histidine. It sits above the iron, steadies bound O₂ with a hydrogen bond, and makes it harder for carbon monoxide to bind straight on.' },
+         { id: 'o2', label: 'O₂ binding', text: 'Oxygen binds to the iron reversibly: picked up in the lungs, released in the tissues. If the iron rusts to Fe³⁺ (methemoglobin), it can no longer carry O₂.' }],
+    draw(c, w, h, t, st) {
+      const cx = w * .5, cy = h * .52, Rr = Math.min(w, h) * .36, cyc = (t % 7) / 7;
+      c.save(); c.globalCompositeOperation = 'lighter';
+      for (let m = 0; m < 8; m++) {
+        const a = m / 8 * TAU + .3 + .04 * Math.sin(t * .5 + m), hx = cx + Math.cos(a) * Rr * 1.15, hy = cy + Math.sin(a) * Rr * .85, d = a + Math.PI / 2 + .45 * Math.sin(m * 1.7), L = Rr * .8;
+        const dx = Math.cos(d), dy = Math.sin(d), nx = -dy, ny = dx;
+        for (let i = 0; i < 60; i++) { const u0 = i / 60, u1 = (i + 1) / 60, ph0 = u0 * TAU * 3.6 + t * 2 + m, ph1 = u1 * TAU * 3.6 + t * 2 + m;
+          const x0 = hx + dx * (u0 - .5) * L + nx * Math.sin(ph0) * 7, y0 = hy + dy * (u0 - .5) * L + ny * Math.sin(ph0) * 7, x1 = hx + dx * (u1 - .5) * L + nx * Math.sin(ph1) * 7, y1 = hy + dy * (u1 - .5) * L + ny * Math.sin(ph1) * 7;
+          const dep = .5 + .5 * Math.cos(ph0); c.strokeStyle = hexA(m % 2 ? PAL.teal : PAL.blue, .15 + .45 * dep); c.lineWidth = 1 + 3 * dep; line(c, x0, y0, x1, y1); }
+        txt(c, 'ABCDEFGH'[m], hx + nx * 16, hy + ny * 16, { s: 9, al: .45 });
+      }
+      c.restore();
+      const rot = .15 * Math.sin(t * .4), hf = st.focus === 'heme' ? 1.4 : 1;
+      c.save(); c.globalCompositeOperation = 'lighter'; c.strokeStyle = hexA(PAL.fe, .8 * hf); c.lineWidth = 1.4;
+      const outer = [];
+      for (let k = 0; k < 4; k++) { const a = rot + k * Math.PI / 2, px = cx + Math.cos(a) * 30, py = cy + Math.sin(a) * 30; pentagon(c, px, py, 11, a + Math.PI); c.stroke();
+        const N = [cx + Math.cos(a) * 19, cy + Math.sin(a) * 19]; c.strokeStyle = hexA(PAL.fe, .5); line(c, cx, cy, N[0], N[1]); c.strokeStyle = hexA(PAL.fe, .8 * hf);
+        outer.push([px + Math.cos(a + .9) * 11, py + Math.sin(a + .9) * 11], [px + Math.cos(a - .9) * 11, py + Math.sin(a - .9) * 11]);
+        line(c, px + Math.cos(a) * 9, py + Math.sin(a) * 9, px + Math.cos(a) * 19, py + Math.sin(a) * 19); }
+      for (let k = 0; k < 4; k++) { const A = outer[k * 2], B = outer[((k + 1) % 4) * 2 + 1]; line(c, A[0], A[1], B[0], B[1]); }
+      c.strokeStyle = hexA(PAL.fe, .5); for (const s of [1, 2]) { const a = rot + s * Math.PI / 2 + .5; let x = cx + Math.cos(a) * 40, y = cy + Math.sin(a) * 40; for (let j = 0; j < 3; j++) { const x2 = x + Math.cos(a + (j % 2 ? .6 : -.6)) * 10, y2 = y + Math.sin(a + (j % 2 ? .6 : -.6)) * 10; line(c, x, y, x2, y2); x = x2; y = y2; } }
+      c.restore();
+      const bound = sm(.33, .38, cyc) * (1 - sm(.74, .79, cyc));
+      const g = c.createRadialGradient(cx, cy, 0, cx, cy, 22 + 8 * bound); g.addColorStop(0, hexA(PAL.fe, .9)); g.addColorStop(1, hexA(PAL.fe, 0)); c.save(); c.globalCompositeOperation = 'lighter'; c.fillStyle = g; c.beginPath(); c.arc(cx, cy, 30, 0, TAU); c.fill(); c.restore();
+      txt(c, 'Fe²⁺', cx, cy, { s: 10, w: 700, c: '#1a1000' });
+      const f8 = [cx, cy + 62], e7 = [cx - 30, cy - 64];
+      c.save(); c.globalCompositeOperation = 'lighter'; c.strokeStyle = hexA(PAL.G, st.focus === 'f8' ? 1 : .7); c.lineWidth = 1.5; pentagon(c, f8[0], f8[1], 10, -Math.PI / 2); c.stroke(); c.setLineDash([3, 3]); line(c, cx, cy + 8, f8[0], f8[1] - 10); c.setLineDash([]); line(c, f8[0], f8[1] + 10, f8[0] + 10, f8[1] + 30);
+      c.strokeStyle = hexA(PAL.G, st.focus === 'e7' ? 1 : .55); pentagon(c, e7[0], e7[1], 10, Math.PI / 2); c.stroke(); line(c, e7[0], e7[1] - 10, e7[0] - 12, e7[1] - 30); c.restore();
+      txt(c, 'His F8', f8[0] + 38, f8[1], { s: 9, c: PAL.G, w: 600 }); txt(c, 'His E7', e7[0] - 40, e7[1], { s: 9, c: PAL.G, w: 600 });
+      let ox, oy; const ap = sm(0, .35, cyc), lv = sm(.77, 1, cyc);
+      if (cyc < .35) { ox = lerp(cx + Rr * 1.3, cx + 2, ap); oy = lerp(cy - Rr * 1.1, cy - 30, ap); } else if (cyc < .77) { ox = cx + 2 + Math.sin(t * 9) * .8; oy = cy - 30; } else { ox = lerp(cx + 2, cx - Rr * 1.4, lv); oy = lerp(cy - 30, cy - Rr * 1.2, lv); }
+      const o2a = Math.max(.25, 1 - lv);
+      c.save(); c.globalCompositeOperation = 'lighter'; c.fillStyle = hexA(PAL.warn, .35 * o2a); c.strokeStyle = hexA(PAL.warn, .95 * o2a); c.lineWidth = 1.4; for (const [x, y] of [[ox, oy], [ox + 10, oy - 9]]) { c.beginPath(); c.arc(x, y, 6.5, 0, TAU); c.fill(); c.stroke(); } line(c, ox + 4, oy - 4, ox + 6, oy - 5); c.restore();
+      txt(c, 'O₂', ox + 22, oy - 16, { s: 10, w: 700, c: PAL.warn, al: o2a });
+      if (bound > .5) { c.save(); c.strokeStyle = hexA(PAL.warn, .7); c.setLineDash([2, 3]); line(c, cx, cy - 8, ox, oy + 6); c.strokeStyle = hexA(PAL.G, .6); line(c, e7[0] + 8, e7[1] + 6, ox + 8, oy - 10); c.restore(); }
+      if (st.focus === 'heme') focusRing(c, cx, cy, 46, PAL.fe, t);
+      if (st.focus === 'f8') focusRing(c, f8[0], f8[1], 16, PAL.G, t);
+      if (st.focus === 'e7') focusRing(c, e7[0], e7[1], 16, PAL.G, t);
+      if (st.focus === 'o2') focusRing(c, ox + 5, oy - 4, 18, PAL.warn, t);
+      txt(c, bound > .5 ? 'OXY · O₂ BOUND' : 'DEOXY · EMPTY', w * .04, 18, { a: 'left', s: 10, w: 600, c: bound > .5 ? PAL.warn : PAL.ink, al: .8 });
+    } },
+  { id: 'in2', map: 'Intron 2', kind: 'intron', f: 2.3, col: PAL.C, tag: 'NON-CODING · INTRON 2', co: '850 bp', title: 'Intron 2: the long silence',
+    desc: 'The longest piece of HBB codes for nothing at all. Introns make up roughly a quarter of your genome, while protein-coding exons are only about 1.5%. They still matter: they carry regulatory signals and let evolution shuffle exons around.',
+    note: 'Sequence shown is illustrative, not the real HBB intron.',
+    hs: [{ id: 'gt', label: 'Starts with GT', text: 'Like nearly every intron, it opens with GT. The spliceosome reads this as “cut here”.' },
+         { id: 'ag2', label: 'Ends with AG', text: 'A run of C’s and T’s (the polypyrimidine tract) leads into the final AG and guides the spliceosome to the 3′ splice site.' },
+         { id: 'm654', label: 'Position 654', text: 'A C→T change here (IVS-II-654) creates a hidden splice site that leaves a scrap of intron in the mRNA. It is one of the most common β-thalassemia mutations in East and Southeast Asia.' }],
+    draw(c, w, h, t, st) {
+      const N = INTRON2.length, pad = 12, area = (w - pad * 2) * (h - pad * 2 - 40);
+      const cell = clamp(Math.floor(Math.sqrt(area / N)), 5, 15), cols = Math.floor((w - pad * 2) / cell), rows = Math.ceil(N / cols);
+      const ox = (w - cols * cell) / 2 + cell / 2, oy = 34 + (h - 54 - rows * cell) / 2 + cell / 2, head = (t * 75) % (N + 140), showT = cell >= 10;
+      c.save(); c.font = `700 ${cell - 3}px ${MONO}`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.globalCompositeOperation = 'lighter';
+      for (let i = 0; i < N; i++) {
+        const x = ox + (i % cols) * cell, y = oy + Math.floor(i / cols) * cell, ch = INTRON2[i], d = head - i;
+        let a = d >= 0 ? Math.max(.22, 1 - d / 280) : .12, col = PAL[ch];
+        if (i < 2 || i >= N - 2) { col = PAL.G; a = 1; }
+        if (i === 653) { col = PAL.warn; a = st.focus === 'm654' ? 1 : .6; }
+        c.fillStyle = hexA(col, a);
+        if (showT) c.fillText(ch, x, y); else c.fillRect(x - cell / 2 + 1, y - cell / 2 + 1, cell - 2, cell - 2);
+      }
+      const hi = Math.floor(head); if (hi < N) { const x = ox + (hi % cols) * cell, y = oy + Math.floor(hi / cols) * cell; const g = c.createRadialGradient(x, y, 0, x, y, cell * 2.5); g.addColorStop(0, hexA(PAL.cyan, .7)); g.addColorStop(1, hexA(PAL.cyan, 0)); c.fillStyle = g; c.beginPath(); c.arc(x, y, cell * 2.5, 0, TAU); c.fill(); }
+      c.restore();
+      const P = i => [ox + (i % cols) * cell, oy + Math.floor(i / cols) * cell];
+      if (st.focus === 'gt') { const [x, y] = P(0); focusRing(c, x + cell / 2, y, cell * 1.4, PAL.G, t); }
+      if (st.focus === 'ag2') { const [x, y] = P(N - 2); focusRing(c, x + cell / 2, y, cell * 1.4, PAL.G, t); }
+      if (st.focus === 'm654') { const [x, y] = P(653); focusRing(c, x, y, cell * 1.3, PAL.warn, t); }
+      txt(c, `IVS-2 · READING ${String(Math.min(N, hi + 1)).padStart(3, '0')} / ${N}`, w * .04, 18, { a: 'left', s: 10, al: .75 });
+      txt(c, '0 codons · 0 amino acids', w * .96, 18, { a: 'right', s: 10, al: .5 });
+    } },
+  { id: 'ex3', map: 'Exon 3', kind: 'exon', f: 1.1, col: PAL.A, tag: 'CODING · EXON 3', co: 'codons 105–146 + stop', title: 'Exon 3: the final sentence',
+    desc: 'The last exon finishes the chain, 146 amino acids in all. When the ribosome reaches the stop codon UAA, no tRNA fits it. A release factor steps in, and the finished chain is set free to fold.',
+    hs: [{ id: 'stop', label: 'Stop codon UAA', text: 'One of three stop codons (UAA, UAG, UGA). They code for no amino acid. They just mean “end of sentence”.' },
+         { id: 'rf', label: 'Release factor', text: 'eRF1 is a protein shaped like a tRNA. It fills the empty A-site and cuts the finished chain loose from the ribosome.' },
+         { id: 'h146', label: 'His-146', text: 'The very last amino acid. It helps hemoglobin release oxygen where tissues are acidic, which is part of the Bohr effect.' }],
+    draw(c, w, h, t, st) {
+      const cyc = (t % 12) / 12, fade = sm(0, .04, cyc) * (1 - sm(.95, 1, cyc)), cw = clamp(w / 10, 36, 56), y = h * .76, rx = w * .42;
+      const p = sm(.02, .5, cyc) * 13, n = clamp(Math.floor(p + .5), 0, 13);
+      c.save(); c.globalAlpha = fade;
+      for (let k = 0; k < EX3.length; k++) {
+        const x = rx + (k - p) * cw; if (x < -cw || x > w + cw) continue; const stop = k === 13, hot = stop ? PAL.warn : PAL.teal, cur = Math.abs(x - rx) < cw / 2;
+        c.save(); c.globalCompositeOperation = 'lighter'; c.strokeStyle = hexA(hot, cur || (stop && st.focus === 'stop') ? .95 : .35); c.fillStyle = hexA(hot, cur ? .14 : .04); rrect(c, x - cw / 2 + 2, y - 13, cw - 4, 26, 5); c.fill(); c.stroke(); c.restore();
+        for (let j = 0; j < 3; j++) txt(c, EX3[k][j], x + (j - 1) * cw * .24, y, { c: stop ? PAL.warn : PAL[EX3[k][j]], s: clamp(cw * .26, 9, 13), w: 700 });
+        txt(c, stop ? 'STOP' : String(133 + k), x, y + 28, { s: 8, al: stop ? .9 : .4, c: stop ? PAL.warn : PAL.ink });
+      }
+      const dk = sm(.64, .86, cyc), path = samplePoly([[rx - 10, y - 40], [w * .16, y - 70], [w * .08, h * .3], [w * .3, h * .1], [w * .96, h * .1]], 14);
+      const total = n + 20;
+      for (let a = 0; a < total; a++) {
+        const pp = path[Math.min(a, path.length - 1)], resIdx = 146 - (13 - n) - a; const aa = a < n ? EX3AA[n - 1 - a] : '';
+        const fa = a * .5, fr = 6 + a * 1.5, tx = w * .74 + Math.cos(fa + t * .5) * fr, ty = h * .32 + Math.sin(fa + t * .5) * fr * .7;
+        const x = lerp(pp.x, tx, dk), y2 = lerp(pp.y, ty, dk) - dk * 0;
+        const isH = a === 0 && n === 13; bead(c, x, y2, aa, isH && st.focus === 'h146' ? PAL.warn : a < n ? AACOL(aa) : PAL.dim || '#3a7f78', a < n ? 7.5 : 5, a < n ? 1 : .45);
+        if (isH && st.focus === 'h146') focusRing(c, x, y2, 12, PAL.warn, t);
+        void resIdx;
+      }
+      if (dk > .5) txt(c, 'β-GLOBIN · 146 aa · FOLDING', w * .74, h * .32 + 70, { s: 9, w: 600, c: PAL.A, al: dk });
+      blob(c, rx, y - 18, 28, PAL.blue, t, 2, .9); blob(c, rx, y + 16, 20, PAL.teal, t, 5, .9);
+      const rk = sm(.52, .62, cyc) * (1 - sm(.86, .92, cyc)); if (rk > 0) { const fx = lerp(w * 1.05, rx + 6, sm(.52, .62, cyc)), fy = lerp(-20, y - 30, sm(.52, .62, cyc)); blob(c, fx, fy, 14, PAL.warn, t, 7, rk * (st.focus === 'rf' ? 1.4 : 1), 'eRF1'); if (st.focus === 'rf') focusRing(c, fx, fy, 18, PAL.warn, t); }
+      if (st.focus === 'stop') { const x = rx + (13 - p) * cw; if (x < w + cw) focusRing(c, x, y, cw * .5, PAL.warn, t); }
+      c.restore();
+      txt(c, cyc < .5 ? 'TRANSLATING EXON 3' : cyc < .64 ? 'STOP REACHED · eRF1 BINDS' : 'CHAIN RELEASED', w * .04, 18, { a: 'left', s: 10, al: .7 });
+    } },
+  { id: 'utr3', map: '3′UTR', kind: 'utr', f: .9, col: PAL.teal, tag: 'mRNA · UNTRANSLATED', co: '132 nt + poly-A', title: '3′ UTR & the poly-A tail',
+    desc: 'After the stop codon comes a tail end that controls how long the message lives. A signal (AAUAAA) tells the cell where to cut. Then an enzyme strings on a poly-A tail of about 200 adenines, which works like a countdown timer for the mRNA.',
+    note: 'Downstream sequence simplified.',
+    hs: [{ id: 'sig', label: 'AAUAAA signal', text: 'The polyadenylation signal. A protein complex called CPSF recognises it.' },
+         { id: 'cut', label: 'Cleavage site', text: 'The RNA is cut 10–30 letters downstream of the signal, usually just after a CA.' },
+         { id: 'tail', label: 'Poly-A tail', text: 'Poly(A) polymerase adds A’s one at a time, with no DNA template at all. As the tail gets nibbled shorter over time, the mRNA is eventually destroyed.' }],
+    draw(c, w, h, t, st) {
+      const PRE = 'UAA…CUGCCUAAUAAAAAACAUUUAUUUUCA', POST = 'UUGCAAUGAUGUAUUUAAAU', cyc = (t % 10) / 10, y = h * .34;
+      const dx = clamp((w * .9) / (PRE.length + POST.length), 7, 13), x0 = w * .05, X = i => x0 + i * dx, si = PRE.indexOf('AAUAAA'), ci = PRE.length;
+      const fade = sm(0, .04, cyc) * (1 - sm(.95, 1, cyc));
+      c.save(); c.globalAlpha = fade;
+      if (st.focus === 'sig' || cyc > .04) { c.save(); c.globalCompositeOperation = 'lighter'; c.fillStyle = hexA(PAL.G, st.focus === 'sig' ? .2 : .1); c.strokeStyle = hexA(PAL.G, .7); rrect(c, X(si) - dx / 2, y - 12, dx * 6, 24, 5); c.fill(); c.stroke(); c.restore(); }
+      for (let i = 0; i < PRE.length; i++) txt(c, PRE[i], X(i), y + Math.sin(i * .5 + t * 1.5) * 2, { c: i < 3 ? PAL.warn : PAL[PRE[i]] || PAL.ink, s: clamp(dx * 1.05, 8, 13), w: 700 });
+      const dk = sm(.3, .5, cyc);
+      for (let i = 0; i < POST.length; i++) txt(c, POST[i], X(ci + i) + dk * 60, y + dk * 50 + Math.sin(i * .5 + t * 1.5) * 2, { c: PAL[POST[i]], s: clamp(dx * 1.05, 8, 13), w: 700, al: 1 - dk });
+      blob(c, X(si + 2.5), y - 30, 16, PAL.G, t, 1, sm(.04, .16, cyc) * (1 - sm(.85, .95, cyc)), 'CPSF');
+      blob(c, X(ci + 8), y + 30, 13, PAL.blue, t, 3, sm(.1, .2, cyc) * (1 - sm(.3, .38, cyc)), 'CstF');
+      const fl = Math.exp(-Math.pow((cyc - .3) / .02, 2)); if (fl > .02 || st.focus === 'cut') { c.save(); c.globalCompositeOperation = 'lighter'; c.strokeStyle = hexA(PAL.warn, Math.max(fl, st.focus === 'cut' ? .7 : 0)); c.lineWidth = 2; line(c, X(ci - .5), y - 22, X(ci - .5), y + 22); c.restore(); txt(c, '✂', X(ci - .5), y - 30, { s: 14, c: PAL.warn, al: Math.max(fl, st.focus === 'cut' ? 1 : 0) }); }
+      const nA = Math.floor(sm(.42, .9, cyc) * 40);
+      let tx = X(ci - .5), ty = y;
+      for (let j = 0; j < nA; j++) { const th = j * .14, rad = h * .28 - j * .9; tx = X(ci) + Math.sin(th) * rad * 1.3; ty = y + rad - Math.cos(th) * rad; txt(c, 'A', tx, ty, { c: PAL.A, s: 11, w: 700, al: .5 + .5 * (j / 40) }); }
+      if (cyc > .42) blob(c, tx + 10, ty + 10, 12, PAL.A, t, 5, 1 - sm(.88, .95, cyc), 'PAP');
+      if (st.focus === 'sig') focusRing(c, X(si + 2.5), y, 34, PAL.G, t);
+      if (st.focus === 'tail' && nA > 4) focusRing(c, tx, ty, 18, PAL.A, t);
+      c.restore();
+      txt(c, `POLY(A) TAIL: ${Math.round(nA / 40 * 200)} A`, w * .96, 18, { a: 'right', s: 10, w: 600, c: PAL.A });
+      txt(c, cyc < .3 ? 'SIGNAL RECOGNISED' : cyc < .42 ? 'CLEAVED' : 'TAILING', w * .04, 18, { a: 'left', s: 10, al: .7 });
+    } },
+  { id: 'hb', map: 'Protein', kind: 'prot', f: 1.1, col: PAL.warn, tag: 'PRODUCT', co: '2 α + 2 β', title: 'Hemoglobin: the payoff', back: true,
+    desc: 'Two β-globin chains from this gene join two α-globin chains (made on chromosome 16) to build hemoglobin. Each red blood cell carries around 270 million of them, ferrying oxygen from your lungs to every cell you have.',
+    hs: [{ id: 'alpha', label: 'α chains', text: '141 amino acids each, coded by the HBA1 and HBA2 genes on chromosome 16.' },
+         { id: 'beta', label: 'β chains', text: '146 amino acids each. This is the protein you just read off HBB.' },
+         { id: 'coop', label: 'Teamwork', text: 'Cooperativity: once one heme grabs O₂, the whole molecule shifts shape so the next three bind more easily. Watch the binding speed up.' }],
+    draw(c, w, h, t, st) {
+      const cx = w * .5, cy = h * .53, S = Math.min(w, h) * .27, a = t * .35, cyc = (t % 12) / 12, bindT = [.12, .36, .47, .53], rel = sm(.82, .92, cyc);
+      const subs = [{ n: 'α1', p: [-1, .62, .55], col: PAL.T, k: 'alpha' }, { n: 'β1', p: [1, .62, -.55], col: PAL.A, k: 'beta' }, { n: 'α2', p: [1, -.62, .55], col: PAL.T, k: 'alpha' }, { n: 'β2', p: [-1, -.62, -.55], col: PAL.A, k: 'beta' }];
+      const pr = subs.map((s, i) => { const [x, y, z] = s.p; const xr = x * Math.cos(a) + z * Math.sin(a), zr = -x * Math.sin(a) + z * Math.cos(a); return { ...s, i, sx: cx + xr * S * .95, sy: cy + y * S * .95, z: zr, sc: 1 + zr * .18 }; }).sort((u, v) => u.z - v.z);
+      let nb = 0;
+      pr.forEach(s => {
+        const b = sm(bindT[s.i], bindT[s.i] + .03, cyc) * (1 - rel); if (b > .5) nb++;
+        const foc = st.focus === s.k ? 1.4 : 1;
+        blob(c, s.sx, s.sy, S * .6 * s.sc, s.col, t, s.i * 2, (.5 + .3 * (s.z + 1) / 2) * foc, '');
+        txt(c, s.n, s.sx - S * .25 * s.sc, s.sy - S * .3 * s.sc, { s: 11, w: 700, c: s.col });
+        const hx = s.sx + S * .16 * s.sc, hy = s.sy + S * .05 * s.sc; c.save(); c.globalCompositeOperation = 'lighter'; c.translate(hx, hy); c.rotate(.5); c.strokeStyle = hexA(PAL.fe, .8); c.fillStyle = hexA(PAL.fe, .15 + .35 * b); rrect(c, -9, -9, 18, 18, 3); c.fill(); c.stroke(); c.restore();
+        if (st.focus === 'coop' || st.focus === s.k) focusRing(c, hx, hy, 12, PAL.fe, t);
+        const appr = sm(bindT[s.i] - .08, bindT[s.i], cyc);
+        if (appr > 0 && rel < 1) { const ox = b > .5 ? hx + 3 : lerp(hx + 70, hx + 3, appr), oy = b > .5 ? hy - 15 : lerp(hy - 70, hy - 15, appr), al = (1 - rel); c.save(); c.globalCompositeOperation = 'lighter'; c.fillStyle = hexA(PAL.warn, .4 * al); c.strokeStyle = hexA(PAL.warn, al); for (const [x, y] of [[ox, oy], [ox + 8, oy - 6]]) { c.beginPath(); c.arc(x, y, 5, 0, TAU); c.fill(); c.stroke(); } c.restore(); }
+        if (rel > 0 && rel < 1 && b < .5) { const ox = hx + 3 + rel * 80, oy = hy - 15 - rel * 60; c.save(); c.globalCompositeOperation = 'lighter'; c.strokeStyle = hexA(PAL.warn, 1 - rel); c.beginPath(); c.arc(ox, oy, 5, 0, TAU); c.stroke(); c.beginPath(); c.arc(ox + 8, oy - 6, 5, 0, TAU); c.stroke(); c.restore(); }
+      });
+      txt(c, `O₂ BOUND: ${nb} / 4`, w * .04, 18, { a: 'left', s: 10, w: 700, c: nb ? PAL.warn : PAL.ink });
+      txt(c, rel > 0 ? 'RELEASING IN TISSUES' : nb ? 'LOADING IN THE LUNGS' : 'DEOXY', w * .96, 18, { a: 'right', s: 10, al: .7 });
+      if (st.focus === 'coop') { const bw = w * .6, bx = w * .2, by = h - 22; c.save(); c.strokeStyle = hexA(PAL.ink, .3); line(c, bx, by, bx + bw, by); bindT.forEach((b, i) => { const x = bx + b / .6 * bw; c.fillStyle = PAL.warn; c.beginPath(); c.arc(x, by, 3.5, 0, TAU); c.fill(); txt(c, `#${i + 1}`, x, by - 10, { s: 8, c: PAL.warn }); }); c.restore(); txt(c, 'each binding comes faster →', bx + bw, by + 12, { a: 'right', s: 8, al: .6 }); }
+    } }
+];
+
+const track = document.getElementById('track'), gmap = document.getElementById('genemap'), exCount = document.getElementById('exCount');
+gmap.innerHTML = CARDS.map((cd, i) => `<button class="seg ${cd.kind}" data-i="${i}" style="--f:${cd.f};--k:${cd.col}" aria-label="Show ${cd.map}"><div class="bar"><i></i></div><span>${cd.map}</span></button>`).join('');
+track.innerHTML = CARDS.map((cd, i) => `
+<article class="gcard" data-i="${i}" style="--k:${cd.col}">
+  <div class="gc-stage"><canvas></canvas><div class="gc-num">${String(i + 1).padStart(2, '0')} / ${CARDS.length}</div></div>
+  <div class="gc-body">
+    <div class="gc-head"><span class="gc-tag">${cd.tag}</span><span class="gc-co">${cd.co}</span></div>
+    <h3>${cd.title}</h3>
+    <p class="gc-desc">${cd.desc}</p>
+    <div class="gc-hs">${cd.hs.map(hh => `<button class="hs" data-h="${hh.id}"><i></i>${hh.label}</button>`).join('')}${cd.toggle ? `<button class="hs tg" data-t="1"><i></i>${cd.toggle}</button>` : ''}${cd.back ? '<button class="hs" data-back="1"><i></i>↑ Fly back to the helix</button>' : ''}</div>
+    <div class="gc-info"><b>Tap a glowing tag</b>to zoom in on that part of the animation.</div>
+    ${cd.note ? `<div class="gc-note">${cd.note}</div>` : ''}
+  </div>
+</article>`).join('');
+const gcards = [...track.children], segs = [...gmap.children];
+CARDS.forEach((cd, i) => { cd.st = { focus: null, mut: false }; cd.el = gcards[i]; cd.cv = gcards[i].querySelector('canvas'); cd.ctx = cd.cv.getContext('2d'); cd.info = gcards[i].querySelector('.gc-info'); });
+function setInfo(cd) {
+  const hh = cd.hs.find(x => x.id === cd.st.focus);
+  if (cd.st.mut && (cd.st.focus === 'c6' || !hh)) cd.info.innerHTML = `<b style="color:var(--warn)">Sickle cell mutation</b>${cd.mutText}`;
+  else if (hh) cd.info.innerHTML = `<b>${hh.label}</b>${hh.text}`;
+  else cd.info.innerHTML = '<b>Tap a glowing tag</b>to zoom in on that part of the animation.';
+  cd.el.querySelectorAll('.hs[data-h]').forEach(b => b.classList.toggle('on', b.dataset.h === cd.st.focus));
+  const tg = cd.el.querySelector('.hs.tg'); if (tg) { tg.classList.toggle('on', cd.st.mut); tg.lastChild.textContent = cd.st.mut ? 'Undo mutation' : cd.toggle; }
+}
+track.addEventListener('click', e => {
+  if (dragMoved) return;
+  const b = e.target.closest('.hs'); if (!b) return;
+  const cd = CARDS[+b.closest('.gcard').dataset.i];
+  if (b.dataset.back) { window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
+  if (b.dataset.t) { cd.st.mut = !cd.st.mut; cd.st.focus = 'c6'; }
+  else cd.st.focus = cd.st.focus === b.dataset.h ? null : b.dataset.h;
+  setInfo(cd);
+  const i = +b.closest('.gcard').dataset.i; if (i !== active) goTo(i);
+});
+let active = 0;
+const stepW = () => gcards[0].getBoundingClientRect().width + 22;
+function goTo(i) { i = clamp(i, 0, CARDS.length - 1); track.scrollTo({ left: i * stepW(), behavior: 'smooth' }); }
+function onTrackScroll() {
+  const i = clamp(Math.round(track.scrollLeft / stepW()), 0, CARDS.length - 1);
+  if (i !== active || !gcards[i].classList.contains('on')) { active = i; gcards.forEach((g, k) => g.classList.toggle('on', k === i)); segs.forEach((s, k) => s.classList.toggle('on', k === i)); exCount.textContent = `${String(i + 1).padStart(2, '0')} / ${CARDS.length}`; }
+}
+track.addEventListener('scroll', onTrackScroll, { passive: true });
+segs.forEach(s => s.addEventListener('click', () => goTo(+s.dataset.i)));
+document.getElementById('prev').onclick = () => goTo(active - 1);
+document.getElementById('next').onclick = () => goTo(active + 1);
+addEventListener('keydown', e => { if (fs < 11.6 || /input|textarea/i.test(document.activeElement?.tagName || '')) return; if (e.key === 'ArrowRight') { e.preventDefault(); goTo(active + 1); } if (e.key === 'ArrowLeft') { e.preventDefault(); goTo(active - 1); } });
+// mouse drag to swipe
+let dragging = false, dragX = 0, dragL = 0, dragMoved = false;
+track.addEventListener('pointerdown', e => { if (e.pointerType !== 'mouse' || e.button !== 0) return; dragging = true; dragMoved = false; dragX = e.clientX; dragL = track.scrollLeft; });
+addEventListener('pointermove', e => { if (!dragging) return; const d = e.clientX - dragX; if (Math.abs(d) > 5 && !dragMoved) { dragMoved = true; track.classList.add('drag'); } if (dragMoved) track.scrollLeft = dragL - d; });
+addEventListener('pointerup', e => { if (!dragging) return; dragging = false; if (dragMoved) { track.classList.remove('drag'); const d = e.clientX - dragX; let i = Math.round(track.scrollLeft / stepW()); if (Math.abs(d) > 60 && i === active) i += d < 0 ? 1 : -1; goTo(i); setTimeout(() => dragMoved = false, 50); } });
+onTrackScroll();
+
+function drawExplorer(dt) {
+  if (fs < 11.2) return;
+  for (let i = active - 1; i <= active + 1; i++) {
+    const cd = CARDS[i]; if (!cd) continue;
+    const cv = cd.cv, w = cv.clientWidth, h = cv.clientHeight; if (!w || !h) continue;
+    const dpr = Math.min(devicePixelRatio || 1, 2);
+    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+    const c = cd.ctx; c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, w, h); c.globalAlpha = 1; c.globalCompositeOperation = 'source-over';
+    try { cd.draw(c, w, h, T, cd.st, dt); } catch (err) { console.error(cd.id, err); }
+  }
+}
+
+/* ================= boot ================= */
+measure();
+if (ok3d) { try { buildScene(); } catch (e) { console.error(e); ok3d = false; } }
+if (!ok3d) canvas.style.display = 'none';
+if (SNAP) window.__gv = { U, get fs() { return fs; }, sampleKF };
+resize();
+addEventListener('resize', resize);
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(measure);
+addEventListener('load', measure);
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
